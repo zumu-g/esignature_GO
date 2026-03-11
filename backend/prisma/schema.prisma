@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  credits       Int      @default(2)
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  documents          Document[]
+  signatures         Signature[]
+  creditTransactions CreditTransaction[]
+  envelopes          Envelope[]
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  filePath  String
+  pageCount Int
+  status    String   @default("draft")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  envelopes Envelope[]
+}
+
+model Signature {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  signatureData String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model Envelope {
+  id          String    @id @default(uuid())
+  documentId  String
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject     String
+  message     String?
+  status      String    @default("sent")
+  expiresAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  recipients Recipient[]
+  fields     Field[]
+}
+
+model Recipient {
+  id           String    @id @default(uuid())
+  envelopeId   String
+  envelope     Envelope  @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  email        String
+  name         String
+  role         String    @default("signer")
+  signingOrder Int       @default(1)
+  status       String    @default("pending")
+  uniqueLink   String    @unique @default(uuid())
+  accessCode   String?
+  viewedAt     DateTime?
+  signedAt     DateTime?
+  createdAt    DateTime  @default(now())
+
+  fields Field[]
+}
+
+model Field {
+  id          String    @id @default(uuid())
+  envelopeId  String
+  envelope    Envelope  @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  recipientId String?
+  recipient   Recipient? @relation(fields: [recipientId], references: [id])
+  type        String
+  page        Int
+  x           Float
+  y           Float
+  width       Float
+  height      Float
+  required    Boolean   @default(true)
+  placeholder String?
+  value       String?
+  createdAt   DateTime  @default(now())
+}
+
+model CreditTransaction {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount          Int
+  transactionType String
+  description     String?
+  stripePaymentId String?
+  createdAt       DateTime @default(now())
+}
