@@ -6,6 +6,8 @@ import prisma from '../db';
 
 const router = Router();
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // Register
 router.post('/register', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -18,6 +20,10 @@ router.post('/register', async (req: AuthRequest, res: Response, next: NextFunct
 
     if (!email || !password || !firstName || !lastName) {
       throw new AppError('All fields are required', 400);
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      throw new AppError('Invalid email format', 400);
     }
 
     if (password.length < 8) {
@@ -75,6 +81,10 @@ router.post('/login', async (req: AuthRequest, res: Response, next: NextFunction
 
     if (!email || !password) {
       throw new AppError('Email and password are required', 400);
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      throw new AppError('Invalid email format', 400);
     }
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });

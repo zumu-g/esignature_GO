@@ -24,7 +24,12 @@ export default function Credits() {
     try {
       const result = await api.purchaseCredits(packId);
       updateCredits(result.credits);
-      const updatedHistory = await api.getCreditHistory();
+      await useAuthStore.getState().loadUser();
+      const [updatedPacks, updatedHistory] = await Promise.all([
+        api.getCredits(),
+        api.getCreditHistory(),
+      ]);
+      setPacks(updatedPacks.packs);
       setHistory(updatedHistory);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Purchase failed');

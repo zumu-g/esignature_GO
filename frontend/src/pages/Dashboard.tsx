@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { api } from '../lib/api';
 import type { Document } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
-import { Upload, FileText, Clock, CheckCircle, Send, Trash2, Download, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { Upload, FileText, Clock, CheckCircle, Send, Trash2, Download, Link as LinkIcon, Loader2, Eye } from 'lucide-react';
 import { PageEntrance, StaggerList, StaggerItem, MotionButton, FadeIn } from '../components/Motion';
 import { EmptyDocumentsIllustration, UploadIllustration } from '../components/Illustrations';
 
@@ -178,7 +178,13 @@ export default function Dashboard() {
                           {recipients.map((r) => (
                             <div key={r.id} className="flex items-center gap-1">
                               <span>{r.name}</span>
-                              {r.status === 'signed' && <CheckCircle className="h-3 w-3 text-green-500" />}
+                              {r.status === 'signed' ? (
+                                <CheckCircle className="h-3 w-3 text-green-500" />
+                              ) : r.status === 'viewed' ? (
+                                <Eye className="h-3 w-3 text-blue-500" />
+                              ) : (
+                                <Clock className="h-3 w-3 text-gray-400" />
+                              )}
                             </div>
                           ))}
                         </div>
@@ -280,7 +286,16 @@ export default function Dashboard() {
                   {recipients.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
                       {recipients.map((r) => (
-                        <span key={r.id} className="mr-2">{r.name} {r.status === 'signed' ? '\u2713' : ''}</span>
+                        <span key={r.id} className="mr-2 inline-flex items-center gap-0.5">
+                          {r.name}
+                          {r.status === 'signed' ? (
+                            <CheckCircle className="h-3 w-3 text-green-500 inline" />
+                          ) : r.status === 'viewed' ? (
+                            <Eye className="h-3 w-3 text-blue-500 inline" />
+                          ) : (
+                            <Clock className="h-3 w-3 text-gray-400 inline" />
+                          )}
+                        </span>
                       ))}
                     </div>
                   )}

@@ -154,6 +154,16 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
       throw new AppError('At least one field is required', 400);
     }
 
+    // Validate recipient emails
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (recipients && recipients.length > 0) {
+      for (const r of recipients) {
+        if (!emailRegex.test(r.email)) {
+          throw new AppError(`Invalid email format: ${r.email}`, 400);
+        }
+      }
+    }
+
     const document = await prisma.document.findFirst({
       where: { id: req.params.id, userId: req.user!.userId },
     });
@@ -194,6 +204,16 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
       )
     );
 
+    // Validate field indices and page numbers
+    for (const f of fields) {
+      if (f.recipientIndex !== -1 && (f.recipientIndex < 0 || f.recipientIndex >= (recipients || []).length)) {
+        throw new AppError('Invalid recipient index for field', 400);
+      }
+      if (f.page < 1 || f.page > document.pageCount) {
+        throw new AppError(`Field page ${f.page} is out of range (document has ${document.pageCount} pages)`, 400);
+      }
+    }
+
     // Create fields and assign to recipients
     await Promise.all(
       fields.map((f) => {
@@ -216,19 +236,24 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
       })
     );
 
-    // Deduct credit
-    await prisma.user.update({
-      where: { id: req.user!.userId },
-      data: { credits: { decrement: 1 } },
-    });
-
-    await prisma.creditTransaction.create({
-      data: {
-        userId: req.user!.userId,
-        amount: -1,
-        transactionType: 'usage',
-        description: `Sent: ${subject}`,
-      },
+    // Deduct credit atomically
+    await prisma.$transaction(async (tx) => {
+      const freshUser = await tx.user.findUnique({ where: { id: req.user!.userId } });
+      if (!freshUser || freshUser.credits < 1) {
+        throw new AppError('Insufficient credits. Please purchase more credits to send documents.', 402);
+      }
+      await tx.user.update({
+        where: { id: req.user!.userId },
+        data: { credits: { decrement: 1 } },
+      });
+      await tx.creditTransaction.create({
+        data: {
+          userId: req.user!.userId,
+          amount: -1,
+          transactionType: 'usage',
+          description: `Sent: ${subject}`,
+        },
+      });
     });
 
     // If no recipients (self-fill only), generate final PDF and mark completed
@@ -321,11 +346,17 @@ router.get('/:id/download', async (req: AuthRequest, res: Response, next: NextFu
     const baseName = path.basename(document.filePath, '.pdf');
     const signedPath = path.join(uploadDir, `${baseName}_signed.pdf`);
 
+    // Allow downloading original with ?original=true query param
+    if (req.query.original === 'true') {
+      res.download(document.filePath, document.name);
+      return;
+    }
+
     try {
       await fs.access(signedPath);
       res.download(signedPath, `${document.name.replace('.pdf', '')}_signed.pdf`);
     } catch {
-      res.download(document.filePath, document.name);
+      throw new AppError('Signed document not yet available. All recipients must complete signing first.', 404);
     }
   } catch (error) {
     next(error);

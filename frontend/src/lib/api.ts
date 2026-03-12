@@ -20,6 +20,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) {
+    // Handle token expiry — but not on auth endpoints (401 there means wrong credentials)
+    if (res.status === 401 && !path.startsWith('/auth/')) {
+      localStorage.removeItem('token');
+      window.dispatchEvent(new CustomEvent('auth:expired'));
+      throw new Error('Session expired. Please log in again.');
+    }
     const data = await res.json().catch(() => ({ error: 'Request failed' }));
     throw new Error(data.error || `HTTP ${res.status}`);
   }

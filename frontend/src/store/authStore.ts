@@ -54,3 +54,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     set((state) => state.user ? { user: { ...state.user, credits } } : {});
   },
 }));
+
+// Listen for auth expiry events from API layer
+if (typeof window !== 'undefined') {
+  window.addEventListener('auth:expired', () => {
+    useAuthStore.getState().logout();
+  });
+}

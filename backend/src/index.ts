@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
 import healthRouter from './routes/health';
@@ -17,14 +18,42 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Rate limiters
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const signingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Middleware
 app.use(cors({
-  origin: true,
+  origin: process.env.FRONTEND_URL || 'http://localhost:5174',
   credentials: true,
 }));
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameSrc: ["'none'"],
+    },
+  },
 }));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb', type: 'application/json' }));
@@ -32,9 +61,9 @@ app.use(express.urlencoded({ extended: true, type: 'application/x-www-form-urlen
 
 // Routes
 app.use('/health', healthRouter);
-app.use('/api/auth', authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/documents', documentsRouter);
-app.use('/api/sign', signingRouter);
+app.use('/api/sign', signingLimiter, signingRouter);
 app.use('/api/signatures', signaturesRouter);
 app.use('/api/credits', creditsRouter);
 

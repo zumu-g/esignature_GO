@@ -91,8 +91,25 @@ export default function SigningView() {
     lastPoint.current = null;
   };
 
+  const isCanvasBlank = (canvas: HTMLCanvasElement): boolean => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return true;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] > 0 && (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
   const applySignature = (fieldId: string) => {
     if (!canvasRef.current) return;
+    if (isCanvasBlank(canvasRef.current)) {
+      setError('Please draw your signature before applying');
+      return;
+    }
     const dataUrl = canvasRef.current.toDataURL('image/png');
     updateFieldValue(fieldId, dataUrl);
     setShowSignPad(null);
@@ -106,6 +123,8 @@ export default function SigningView() {
 
   const handleSubmit = async () => {
     if (!link || !signingDoc) return;
+
+    if (!window.confirm('Are you sure you want to submit? You cannot change your signature after submission.')) return;
 
     // Validate required fields
     const requiredFields = signingDoc.fields.filter((f) => f.required);

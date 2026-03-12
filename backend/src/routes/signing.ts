@@ -153,6 +153,32 @@ router.post('/:link/complete', async (req: Request, res: Response, next: NextFun
       }
     }
 
+    // Validate field value sizes and formats
+    for (const sf of submittedFields) {
+      if (!sf.value) continue;
+      const fieldDef = myFields.find((f) => f.id === sf.id);
+      if (!fieldDef) {
+        throw new AppError('Invalid field submission', 400);
+      }
+      sf.value = sf.value.trim();
+      if (fieldDef.type === 'signature') {
+        if (!sf.value.startsWith('data:image/png;base64,')) {
+          throw new AppError('Invalid signature format', 400);
+        }
+        if (sf.value.length > 500000) {
+          throw new AppError('Signature data too large', 400);
+        }
+      } else if (fieldDef.type === 'text') {
+        if (sf.value.length > 1000) {
+          throw new AppError('Text value too long (max 1000 characters)', 400);
+        }
+      } else if (fieldDef.type === 'date') {
+        if (sf.value.length > 50) {
+          throw new AppError('Date value too long', 400);
+        }
+      }
+    }
+
     // Perform all signing operations in a transaction
     const allComplete = await prisma.$transaction(async (tx) => {
       // Update field values

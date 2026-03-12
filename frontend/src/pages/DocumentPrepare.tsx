@@ -42,6 +42,8 @@ const FIELD_TYPES = [
 
 const RECIPIENT_COLORS = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6'];
 
+const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
 export default function DocumentPrepare() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -70,6 +72,17 @@ export default function DocumentPrepare() {
       });
     }
   }, [id]);
+
+  // Warn before navigating away with unsaved work
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (fields.length > 0) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [fields.length]);
 
   const handlePageClick = useCallback((e: React.MouseEvent) => {
     if (draggingPlacedField) return; // ignore clicks at end of drag
@@ -125,33 +138,37 @@ export default function DocumentPrepare() {
   const handleSend = async () => {
     if (!id || !doc) return;
 
-    // Validate
+    // Validate — collect all errors at once
     const validRecipients = recipients.filter((r) => r.name && r.email);
     const recipientFields = fields.filter((f) => f.recipientIndex >= 0);
     const selfFillFields = fields.filter((f) => f.recipientIndex === -1);
+    const errors: string[] = [];
 
+    if (!subject) errors.push('Subject is required');
+    if (fields.length === 0) errors.push('Place at least one field on the document');
     if (recipientFields.length > 0 && validRecipients.length === 0) {
-      setError('Add at least one recipient with name and email');
-      return;
+      errors.push('Add at least one recipient with name and email');
     }
-    if (fields.length === 0) {
-      setError('Place at least one field on the document');
-      return;
+    const invalidEmails = validRecipients.filter((r) => !isValidEmail(r.email));
+    if (invalidEmails.length > 0) {
+      errors.push(`Invalid email format: ${invalidEmails.map((r) => r.email).join(', ')}`);
     }
-    // Check self-fill fields have values
     const emptySelfFields = selfFillFields.filter((f) => !f.value);
     if (emptySelfFields.length > 0) {
-      setError('Fill in all your text fields before sending');
-      return;
-    }
-    if (!subject) {
-      setError('Subject is required');
-      return;
+      errors.push('Fill in all your text fields before sending');
     }
     if ((user?.credits ?? 0) < 1) {
-      setError('Insufficient credits. Please purchase more credits.');
+      errors.push('Insufficient credits. Please purchase more credits');
+    }
+
+    if (errors.length > 0) {
+      setError(errors.join('. '));
       return;
     }
+
+    // Confirmation dialog
+    const confirmMessage = `Send "${subject}" to ${validRecipients.length} recipient(s)?\n\nThis will use 1 credit (${user?.credits ?? 0} remaining).`;
+    if (!window.confirm(confirmMessage)) return;
 
     setSending(true);
     setError('');
