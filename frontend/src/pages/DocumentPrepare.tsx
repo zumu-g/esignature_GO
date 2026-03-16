@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Document as PdfDocument, Page, pdfjs } from 'react-pdf';
 import { api } from '../lib/api';
-import type { Document } from '../lib/api';
+import type { Document, DetectedField } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import {
-  PenTool, Type, Calendar, CheckSquare, Plus, Trash2, Send, ChevronLeft, ChevronRight, Users, GripVertical, Edit3
+  PenTool, Type, Calendar, CheckSquare, Plus, Trash2, Send, ChevronLeft, ChevronRight, Users, GripVertical, Edit3, Sparkles, Loader2, X
 } from 'lucide-react';
 import { PageEntrance, MotionButton, SuccessEntrance, FadeIn } from '../components/Motion';
 import { SuccessIllustration } from '../components/Illustrations';
@@ -64,11 +64,26 @@ export default function DocumentPrepare() {
   const [showSidebar, setShowSidebar] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
 
+  const [loadingDoc, setLoadingDoc] = useState(true);
+  const [showSmartFill, setShowSmartFill] = useState(false);
+  const [detectingFields, setDetectingFields] = useState(false);
+  const [detectedFields, setDetectedFields] = useState<(DetectedField & { answer: string })[]>([]);
+
+  const pdfFile = useMemo(() => ({
+    url: `/api/documents/${id}/pdf`,
+    httpHeaders: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+  }), [id]);
+
   useEffect(() => {
     if (id) {
+      setLoadingDoc(true);
       api.getDocument(id).then((d) => {
         setDoc(d);
         setSubject(`Please sign: ${d.name}`);
+      }).catch((err) => {
+        setError(err instanceof Error ? err.message : 'Failed to load document');
+      }).finally(() => {
+        setLoadingDoc(false);
       });
     }
   }, [id]);
@@ -116,6 +131,56 @@ export default function DocumentPrepare() {
   const removeField = (fieldId: string) => {
     setFields((prev) => prev.filter((f) => f.id !== fieldId));
     if (selectedField === fieldId) setSelectedField(null);
+  };
+
+  const handleSmartFill = async () => {
+    if (!id) return;
+    setDetectingFields(true);
+    setShowSmartFill(true);
+    setError('');
+    try {
+      const result = await api.detectFields(id);
+      setDetectedFields(result.fields.map((f) => ({ ...f, answer: '' })));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to detect fields');
+      setShowSmartFill(false);
+    } finally {
+      setDetectingFields(false);
+    }
+  };
+
+  const applySmartFill = () => {
+    const answered = detectedFields.filter((f) => f.answer.trim());
+    if (answered.length === 0) return;
+
+    const FIELD_SIZES: Record<string, { width: number; height: number }> = {
+      text: { width: 180, height: 30 },
+      date: { width: 140, height: 30 },
+      signature: { width: 200, height: 60 },
+    };
+
+    // Place fields in a column on the current page, spaced vertically
+    const startY = 80;
+    const spacing = 40;
+
+    const newFields: PlacedField[] = answered.map((f, i) => {
+      const size = FIELD_SIZES[f.fieldType] || FIELD_SIZES.text;
+      return {
+        id: crypto.randomUUID(),
+        type: f.fieldType,
+        page: currentPage - 1,
+        x: 60,
+        y: startY + i * spacing,
+        width: size.width,
+        height: size.height,
+        recipientIndex: -1,
+        value: f.fieldType === 'date' ? f.answer : f.answer,
+      };
+    });
+
+    setFields((prev) => [...prev, ...newFields]);
+    setShowSmartFill(false);
+    setDetectedFields([]);
   };
 
   const addRecipient = () => {
@@ -256,8 +321,23 @@ export default function DocumentPrepare() {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Loading document...</p>
+          {error ? (
+            <>
+              <p className="text-red-600 font-medium mb-2">Failed to load document</p>
+              <p className="text-sm text-gray-500 mb-4">{error}</p>
+              <button
+                onClick={() => navigate('/')}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Back to Dashboard
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Loading document...</p>
+            </>
+          )}
         </div>
       </div>
     );
@@ -270,6 +350,14 @@ export default function DocumentPrepare() {
     <div className="flex flex-col lg:flex-row gap-0 lg:gap-6 -mx-4 -mt-4">
       {/* Mobile toolbar */}
       <div className="lg:hidden flex items-center gap-2 p-3 bg-white border-b border-gray-200 overflow-x-auto">
+        <button
+          onClick={handleSmartFill}
+          disabled={detectingFields}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium border border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100 flex-shrink-0 transition-colors"
+        >
+          {detectingFields ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          Smart Fill
+        </button>
         <button
           onClick={() => setShowSidebar(!showSidebar)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 flex-shrink-0"
@@ -306,6 +394,15 @@ export default function DocumentPrepare() {
 
       {/* Left sidebar - Fields & Recipients */}
       <div className={`w-72 flex-shrink-0 bg-white border-r border-gray-200 p-4 overflow-y-auto ${showSidebar ? 'block' : 'hidden'} lg:block lg:min-h-[calc(100vh-64px)]`}>
+        <button
+          onClick={handleSmartFill}
+          disabled={detectingFields}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border-2 border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 mb-4 transition-colors duration-150"
+        >
+          {detectingFields ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          {detectingFields ? 'Detecting fields...' : 'Smart Fill'}
+        </button>
+
         <h3 className="text-sm font-semibold text-gray-900 mb-2">Your Fields</h3>
         <p className="text-[11px] text-gray-400 mb-2">Fill in yourself — text is added to the PDF directly</p>
         <div className="grid grid-cols-2 gap-2 mb-4">
@@ -473,10 +570,7 @@ export default function DocumentPrepare() {
             onClick={handlePageClick}
           >
             <PdfDocument
-              file={{
-                url: `/api/documents/${id}/pdf`,
-                httpHeaders: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-              }}
+              file={pdfFile}
               loading={<div className="w-full max-w-[612px] aspect-[612/792] bg-gray-100 animate-pulse" />}
               onLoadSuccess={() => {}}
             >
@@ -534,21 +628,30 @@ export default function DocumentPrepare() {
                   }}
                 >
                   {isSelfFill ? (
-                    <input
-                      type={field.type === 'date' ? 'date' : 'text'}
-                      value={field.value || ''}
-                      placeholder={field.type === 'date' ? '' : 'Type here...'}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        setFields((prev) =>
-                          prev.map((f) => f.id === field.id ? { ...f, value: e.target.value } : f)
-                        );
-                      }}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full h-full px-2 text-sm bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
-                    />
+                    <div className="flex items-center w-full h-full">
+                      <div
+                        className="flex-shrink-0 flex items-center justify-center h-full px-1 cursor-grab active:cursor-grabbing"
+                        style={{ color }}
+                        title="Drag to reposition"
+                      >
+                        <GripVertical className="h-3.5 w-3.5" />
+                      </div>
+                      <input
+                        type={field.type === 'date' ? 'date' : 'text'}
+                        value={field.value || ''}
+                        placeholder={field.type === 'date' ? '' : 'Type here...'}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setFields((prev) =>
+                            prev.map((f) => f.id === field.id ? { ...f, value: e.target.value } : f)
+                          );
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-1 min-w-0 h-full px-1 text-sm bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
+                      />
+                    </div>
                   ) : (
                     <div className="flex items-center gap-1 pointer-events-none">
                       <GripVertical className="h-3 w-3" style={{ color }} />
@@ -594,6 +697,115 @@ export default function DocumentPrepare() {
         </div>
       </div>
     </div>
+
+    {/* Smart Fill Modal */}
+    {showSmartFill && (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowSmartFill(false)}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Smart Fill</h3>
+                <p className="text-[11px] text-gray-500">Answer the questions below to fill the form</p>
+              </div>
+            </div>
+            <button onClick={() => setShowSmartFill(false)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4">
+            {detectingFields ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 text-purple-500 animate-spin mb-3" />
+                <p className="text-sm text-gray-500">Analyzing document...</p>
+              </div>
+            ) : detectedFields.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-sm text-gray-500 mb-1">No form fields detected</p>
+                <p className="text-xs text-gray-400">Try placing fields manually instead</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {detectedFields.map((field, i) => (
+                  <div key={field.type + i}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {field.question}
+                      {field.context && (
+                        <span className="text-[10px] text-gray-400 font-normal ml-2">
+                          found: &ldquo;...{field.context.substring(0, 40)}...&rdquo;
+                        </span>
+                      )}
+                    </label>
+                    {field.fieldType === 'date' ? (
+                      <input
+                        type="date"
+                        value={field.answer}
+                        onChange={(e) => {
+                          setDetectedFields((prev) =>
+                            prev.map((f, j) => j === i ? { ...f, answer: e.target.value } : f)
+                          );
+                        }}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    ) : field.fieldType === 'signature' ? (
+                      <div className="text-xs text-gray-400 italic py-2">
+                        Signature fields will be added for recipients to sign
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        value={field.answer}
+                        onChange={(e) => {
+                          setDetectedFields((prev) =>
+                            prev.map((f, j) => j === i ? { ...f, answer: e.target.value } : f)
+                          );
+                        }}
+                        placeholder={`Enter ${field.question.toLowerCase()}`}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {detectedFields.length > 0 && !detectingFields && (
+            <div className="p-4 border-t border-gray-200 flex items-center justify-between">
+              <p className="text-xs text-gray-400">
+                {detectedFields.filter((f) => f.answer.trim()).length} of {detectedFields.filter((f) => f.fieldType !== 'signature').length} answered
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowSmartFill(false)}
+                  className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={applySmartFill}
+                  disabled={detectedFields.filter((f) => f.answer.trim()).length === 0}
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Place {detectedFields.filter((f) => f.answer.trim()).length} Fields
+                </button>
+              </div>
+            </div>
+          )}
+        </motion.div>
+      </div>
+    )}
     </PageEntrance>
   );
 }

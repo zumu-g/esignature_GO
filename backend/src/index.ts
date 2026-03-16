@@ -40,9 +40,10 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5174',
   credentials: true,
 }));
+const isProduction = process.env.NODE_ENV === 'production';
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: {
+  contentSecurityPolicy: isProduction ? {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
@@ -53,7 +54,7 @@ app.use(helmet({
       objectSrc: ["'none'"],
       frameSrc: ["'none'"],
     },
-  },
+  } : false,
 }));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb', type: 'application/json' }));

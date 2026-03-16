@@ -21,16 +21,25 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     // Handle token expiry — but not on auth endpoints (401 there means wrong credentials)
-    if (res.status === 401 && !path.startsWith('/auth/')) {
-      localStorage.removeItem('token');
-      window.dispatchEvent(new CustomEvent('auth:expired'));
+    if (res.status === 401 && path && !path.startsWith('/auth/')) {
+      // Defer logout so it doesn't interrupt in-flight navigation
+      setTimeout(() => {
+        localStorage.removeItem('token');
+        window.dispatchEvent(new CustomEvent('auth:expired'));
+      }, 0);
       throw new Error('Session expired. Please log in again.');
     }
     const data = await res.json().catch(() => ({ error: 'Request failed' }));
     throw new Error(data.error || `HTTP ${res.status}`);
   }
 
-  return res.json();
+  // Safely parse JSON — handle non-JSON responses (e.g. proxy errors)
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Invalid server response');
+  }
 }
 
 export const api = {
@@ -55,6 +64,9 @@ export const api = {
   getDocument: (id: string) => request<Document>('/documents/' + id),
 
   getDocumentPdfUrl: (id: string) => `${API_BASE}/documents/${id}/pdf`,
+
+  detectFields: (id: string) =>
+    request<{ fields: DetectedField[]; pageCount: number; textPreview: string }>('/documents/' + id + '/detect-fields'),
 
   deleteDocument: (id: string) => request<{ success: boolean }>('/documents/' + id, { method: 'DELETE' }),
 
@@ -179,6 +191,13 @@ export interface CreditTransaction {
   transactionType: string;
   description?: string;
   createdAt: string;
+}
+
+export interface DetectedField {
+  question: string;
+  type: string;
+  fieldType: string;
+  context: string;
 }
 
 export interface SendDocumentData {

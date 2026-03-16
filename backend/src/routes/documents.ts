@@ -363,4 +363,70 @@ router.get('/:id/download', async (req: AuthRequest, res: Response, next: NextFu
   }
 });
 
+// Detect form fields from PDF text
+router.get('/:id/detect-fields', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const document = await prisma.document.findFirst({
+      where: { id: req.params.id, userId: req.user!.userId },
+    });
+
+    if (!document) {
+      throw new AppError('Document not found', 404);
+    }
+
+    // @ts-ignore - pdf-parse v1 has no types
+    const pdfParse = (await import('pdf-parse')).default;
+    const pdfBuffer = await fs.readFile(document.filePath);
+    const pdfData = await pdfParse(pdfBuffer) as { text: string; numpages: number };
+
+    // Common form field patterns — label followed by colon, underscores, or blank
+    const patterns: { regex: RegExp; question: string; type: string; fieldType: string }[] = [
+      { regex: /\b(full\s*name|your\s*name|print\s*name|name\s*of\s*\w+)\b/i, question: 'Full Name', type: 'name', fieldType: 'text' },
+      { regex: /\b(first\s*name|given\s*name)\b/i, question: 'First Name', type: 'firstName', fieldType: 'text' },
+      { regex: /\b(last\s*name|surname|family\s*name)\b/i, question: 'Last Name', type: 'lastName', fieldType: 'text' },
+      { regex: /\b(date\s*of\s*birth|d\.?o\.?b\.?|birth\s*date)\b/i, question: 'Date of Birth', type: 'dob', fieldType: 'date' },
+      { regex: /\b(email\s*address|e-?mail)\b/i, question: 'Email Address', type: 'email', fieldType: 'text' },
+      { regex: /\b(phone\s*number|telephone|mobile|cell\s*phone|contact\s*number)\b/i, question: 'Phone Number', type: 'phone', fieldType: 'text' },
+      { regex: /\b(address|street\s*address|mailing\s*address|residential\s*address)\b/i, question: 'Address', type: 'address', fieldType: 'text' },
+      { regex: /\b(city|town|suburb)\b/i, question: 'City / Town', type: 'city', fieldType: 'text' },
+      { regex: /\b(state|province|county)\b/i, question: 'State / Province', type: 'state', fieldType: 'text' },
+      { regex: /\b(post\s*code|zip\s*code|postal\s*code)\b/i, question: 'Postcode / ZIP', type: 'postcode', fieldType: 'text' },
+      { regex: /\b(country|nationality)\b/i, question: 'Country', type: 'country', fieldType: 'text' },
+      { regex: /\b(company|organisation|organization|employer|business\s*name)\b/i, question: 'Company / Organisation', type: 'company', fieldType: 'text' },
+      { regex: /\b(position|job\s*title|title|role|occupation)\b/i, question: 'Position / Title', type: 'title', fieldType: 'text' },
+      { regex: /\b(abn|acn|tax\s*file|tfn|ssn|social\s*security)\b/i, question: 'Tax / ID Number', type: 'taxId', fieldType: 'text' },
+      { regex: /\b(date|dated|today'?s?\s*date)\b(?!\s*of\s*birth)/i, question: 'Date', type: 'date', fieldType: 'date' },
+      { regex: /\b(signature|signed?\s*by|authorised\s*signature)\b/i, question: 'Signature', type: 'signature', fieldType: 'signature' },
+    ];
+
+    const text = pdfData.text;
+    const detectedFields: { question: string; type: string; fieldType: string; context: string }[] = [];
+    const seenTypes = new Set<string>();
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern.regex);
+      if (match && !seenTypes.has(pattern.type)) {
+        seenTypes.add(pattern.type);
+        // Extract surrounding context for the match
+        const idx = match.index || 0;
+        const context = text.substring(Math.max(0, idx - 30), Math.min(text.length, idx + match[0].length + 30)).trim();
+        detectedFields.push({
+          question: pattern.question,
+          type: pattern.type,
+          fieldType: pattern.fieldType,
+          context,
+        });
+      }
+    }
+
+    res.json({
+      fields: detectedFields,
+      pageCount: document.pageCount,
+      textPreview: text.substring(0, 500),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
