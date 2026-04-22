@@ -43,7 +43,11 @@ router.post('/purchase', async (req: AuthRequest, res: Response, next: NextFunct
       throw new AppError('Invalid credit pack', 400);
     }
 
-    // In production, this would process Stripe payment first
+    // STUB: In production, Stripe payment must be verified before granting credits
+    if (process.env.NODE_ENV === 'production') {
+      throw new AppError('Payment processing not configured. Please contact support.', 501);
+    }
+
     const user = await prisma.user.update({
       where: { id: req.user!.userId },
       data: { credits: { increment: pack.credits } },

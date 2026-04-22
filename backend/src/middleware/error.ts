@@ -16,10 +16,22 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  console.error('Error:', err);
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('Error:', err);
+  } else {
+    console.error('Error:', err.message);
+  }
 
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
+      error: err.message
+    });
+    return;
+  }
+
+  // Handle multer errors as 400
+  if (err.message === 'Only PDF files are allowed' || (err as any).code?.startsWith?.('LIMIT_')) {
+    res.status(400).json({
       error: err.message
     });
     return;

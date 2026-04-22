@@ -55,6 +55,16 @@ export async function applyFieldsToPdf(
         size: 12,
         color: rgb(0, 0, 0),
       });
+    } else if (field.type === 'checkbox') {
+      if (field.value === 'true') {
+        // Draw a checkmark
+        page.drawText('✓', {
+          x: field.x + 2,
+          y: pageHeight - field.y - field.height + 2,
+          size: Math.min(field.width, field.height) * 0.8,
+          color: rgb(0, 0, 0),
+        });
+      }
     }
   }
 

@@ -102,7 +102,15 @@ router.get('/:link/pdf', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Signing link not found', 404);
     }
 
+    if (recipient.envelope.status === 'voided') {
+      throw new AppError('This document has been voided', 400);
+    }
+
     const absolutePath = path.resolve(recipient.envelope.document.filePath);
+    const uploadsAbsolute = path.resolve(uploadDir);
+    if (!absolutePath.startsWith(uploadsAbsolute)) {
+      throw new AppError('Invalid file path', 400);
+    }
     res.sendFile(absolutePath);
   } catch (error) {
     next(error);
@@ -142,6 +150,24 @@ router.post('/:link/complete', async (req: Request, res: Response, next: NextFun
       throw new AppError('You have already signed this document', 400);
     }
 
+    if (recipient.envelope.status === 'voided') {
+      throw new AppError('This document has been voided', 400);
+    }
+
+    // Re-check signing order at completion time
+    const allRecipients = recipient.envelope.recipients;
+    const earlierIncomplete = allRecipients.some(
+      (r) => r.signingOrder < recipient.signingOrder && r.status !== 'signed'
+    );
+    if (earlierIncomplete) {
+      throw new AppError('Waiting for previous signers to complete', 400);
+    }
+
+    // Validate submitted fields array
+    if (!Array.isArray(submittedFields)) {
+      throw new AppError('Fields must be an array', 400);
+    }
+
     // Validate required fields for this recipient
     const myFields = recipient.envelope.fields.filter((f) => f.recipientId === recipient.id);
     const requiredFields = myFields.filter((f) => f.required);
@@ -179,16 +205,21 @@ router.post('/:link/complete', async (req: Request, res: Response, next: NextFun
       }
     }
 
+    // Build a set of valid field IDs belonging to this recipient
+    const myFieldIds = new Set(myFields.map((f) => f.id));
+
     // Perform all signing operations in a transaction
     const allComplete = await prisma.$transaction(async (tx) => {
-      // Update field values
+      // Update only fields that belong to this recipient
       await Promise.all(
-        submittedFields.map((sf) =>
-          tx.field.update({
-            where: { id: sf.id },
-            data: { value: sf.value },
-          })
-        )
+        submittedFields
+          .filter((sf) => myFieldIds.has(sf.id))
+          .map((sf) =>
+            tx.field.update({
+              where: { id: sf.id },
+              data: { value: sf.value },
+            })
+          )
       );
 
       // Mark recipient as signed
@@ -206,24 +237,7 @@ router.post('/:link/complete', async (req: Request, res: Response, next: NextFun
       const allSignersComplete = allSigners.every((r) => r.status === 'signed');
 
       if (allSignersComplete) {
-        // All signers done - generate final PDF
-        const allFields = await tx.field.findMany({
-          where: { envelopeId: recipient.envelope.id },
-        });
-
-        const fieldsForPdf = allFields.map((f) => ({
-          id: f.id,
-          type: f.type,
-          page: f.page,
-          x: f.x,
-          y: f.y,
-          width: f.width,
-          height: f.height,
-          value: f.value,
-        }));
-
-        await saveFinalPdf(recipient.envelope.document.filePath, fieldsForPdf, uploadDir);
-
+        // Mark completed in DB — PDF generation happens outside transaction
         await tx.envelope.update({
           where: { id: recipient.envelope.id },
           data: { status: 'completed', completedAt: new Date() },
@@ -237,6 +251,18 @@ router.post('/:link/complete', async (req: Request, res: Response, next: NextFun
 
       return allSignersComplete;
     });
+
+    // Generate final PDF outside transaction to avoid file I/O in DB lock
+    if (allComplete) {
+      const allFields = await prisma.field.findMany({
+        where: { envelopeId: recipient.envelope.id },
+      });
+      const fieldsForPdf = allFields.map((f) => ({
+        id: f.id, type: f.type, page: f.page,
+        x: f.x, y: f.y, width: f.width, height: f.height, value: f.value,
+      }));
+      await saveFinalPdf(recipient.envelope.document.filePath, fieldsForPdf, uploadDir);
+    }
 
     res.json({
       success: true,

@@ -152,7 +152,7 @@ export default function SigningView() {
 
   if (error && !signingDoc) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full bg-white rounded-lg border border-gray-200 p-6 text-center">
           <div className="text-red-500 text-lg font-medium mb-2">Unable to load document</div>
           <p className="text-sm text-gray-500">{error}</p>
@@ -163,7 +163,7 @@ export default function SigningView() {
 
   if (completed) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50">
         <SuccessEntrance className="max-w-md w-full bg-white rounded-lg border border-gray-200 p-6 text-center">
           <SuccessIllustration size={140} className="mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Document Signed!</h2>
@@ -185,20 +185,20 @@ export default function SigningView() {
 
   if (!signingDoc) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
       </div>
     );
   }
 
-  const pageFields = signingDoc.fields.filter((f) => f.page === currentPage - 1);
+  const pageFields = signingDoc.fields.filter((f) => f.page === currentPage);
   const filledCount = fieldValues.filter((fv) => fv.value).length;
   const totalRequired = signingDoc.fields.filter((f) => f.required).length;
 
   return (
-    <PageEntrance className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
+    <PageEntrance className="min-h-dvh bg-gray-100">
+      {/* Header — sticky so submit button is always reachable */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between">
           <div>
             <div className="flex items-center gap-2 text-lg font-bold text-blue-600">
@@ -245,7 +245,8 @@ export default function SigningView() {
         <button
           onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
           disabled={currentPage <= 1}
-          className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 disabled:opacity-30"
+          aria-label="Previous page"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
@@ -255,7 +256,8 @@ export default function SigningView() {
         <button
           onClick={() => setCurrentPage((p) => Math.min(signingDoc.pageCount, p + 1))}
           disabled={currentPage >= signingDoc.pageCount}
-          className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 disabled:opacity-30"
+          aria-label="Next page"
         >
           <ChevronRight className="h-5 w-5" />
         </button>
@@ -266,15 +268,16 @@ export default function SigningView() {
         <div className="relative bg-white shadow-lg">
           <PdfDocument
             file={`/api/sign/${link}/pdf`}
-            loading={<div className="w-[612px] h-[792px] bg-gray-100 animate-pulse" />}
+            loading={<div style={{ width: pdfWidth, height: pdfWidth * (792 / 612) }} className="bg-gray-100 animate-pulse" />}
           >
             <Page pageNumber={currentPage} width={pdfWidth} renderTextLayer={true} renderAnnotationLayer={true} />
           </PdfDocument>
 
-          {/* Field overlays */}
+          {/* Field overlays — scaled to match responsive PDF width */}
           {pageFields.map((field) => {
             const fieldValue = fieldValues.find((fv) => fv.id === field.id);
             const isFilled = !!fieldValue?.value;
+            const scale = pdfWidth / 612;
 
             return (
               <div
@@ -283,14 +286,21 @@ export default function SigningView() {
                   isFilled ? 'border-green-400 bg-green-50/50' : 'border-blue-400 bg-blue-50/50 hover:bg-blue-100/50'
                 }`}
                 style={{
-                  left: field.x,
-                  top: field.y,
-                  width: field.width,
-                  height: field.height,
+                  left: field.x * scale,
+                  top: field.y * scale,
+                  width: field.width * scale,
+                  height: field.height * scale,
                 }}
                 onClick={() => {
                   if (field.type === 'signature') {
                     setShowSignPad(field.id);
+                    // Clear canvas when opening for a new field
+                    requestAnimationFrame(() => {
+                      if (canvasRef.current) {
+                        const ctx = canvasRef.current.getContext('2d');
+                        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                      }
+                    });
                   }
                 }}
               >
@@ -335,39 +345,42 @@ export default function SigningView() {
           <div className="border-2 border-gray-200 rounded-lg mb-4 touch-none">
             <canvas
               ref={canvasRef}
-              width={Math.min(460, viewportWidth - 64)}
-              height={Math.round(Math.min(460, viewportWidth - 64) * (160 / 460))}
+              width={Math.min(460, viewportWidth - 64) * (typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1)}
+              height={Math.max(140, Math.round(Math.min(460, viewportWidth - 64) * (160 / 460))) * (typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1)}
+              style={{ width: Math.min(460, viewportWidth - 64), height: Math.max(140, Math.round(Math.min(460, viewportWidth - 64) * (160 / 460))) }}
               className="w-full cursor-crosshair"
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
-              onTouchStart={startDrawing}
-              onTouchMove={draw}
-              onTouchEnd={stopDrawing}
+              onTouchStart={(e) => { e.preventDefault(); startDrawing(e); }}
+              onTouchMove={(e) => { e.preventDefault(); draw(e); }}
+              onTouchEnd={(e) => { e.preventDefault(); stopDrawing(); }}
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <MotionButton
               onClick={clearCanvas}
-              className="px-4 py-2.5 border border-gray-200 rounded-md text-sm text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors duration-150"
+              className="px-4 py-2.5 min-h-[44px] border border-gray-200 rounded-md text-sm text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors duration-150"
             >
               Clear
             </MotionButton>
-            <div className="flex-1" />
-            <MotionButton
-              onClick={() => setShowSignPad(null)}
-              className="px-4 py-2.5 border border-gray-200 rounded-md text-sm text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors duration-150"
-            >
-              Cancel
-            </MotionButton>
-            <MotionButton
-              onClick={() => showSignPad && applySignature(showSignPad)}
-              className="px-4 py-2.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors duration-150"
-            >
-              Apply Signature
-            </MotionButton>
+            <div className="flex-1 hidden sm:block" />
+            <div className="flex gap-2">
+              <MotionButton
+                onClick={() => setShowSignPad(null)}
+                className="flex-1 sm:flex-none px-4 py-2.5 min-h-[44px] border border-gray-200 rounded-md text-sm text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors duration-150"
+              >
+                Cancel
+              </MotionButton>
+              <MotionButton
+                onClick={() => showSignPad && applySignature(showSignPad)}
+                className="flex-1 sm:flex-none px-4 py-2.5 min-h-[44px] bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors duration-150"
+              >
+                Apply
+              </MotionButton>
+            </div>
           </div>
         </div>
       </ModalOverlay>

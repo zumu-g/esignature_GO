@@ -76,7 +76,26 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  downloadDocument: (id: string) => `${API_BASE}/documents/${id}/download`,
+  downloadDocument: async (id: string) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_BASE}/documents/${id}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: 'Download failed' }));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition');
+    const filenameMatch = disposition?.match(/filename="?(.+?)"?$/);
+    const filename = filenameMatch ? filenameMatch[1] : 'document_signed.pdf';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 
   // Signing (public)
   getSigningDocument: (link: string) => request<SigningDocument>('/sign/' + link),

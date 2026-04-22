@@ -126,6 +126,10 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response, next: NextFunctio
     }
 
     const absolutePath = path.resolve(document.filePath);
+    const uploadsAbsolute = path.resolve(uploadDir);
+    if (!absolutePath.startsWith(uploadsAbsolute)) {
+      throw new AppError('Invalid file path', 400);
+    }
     res.sendFile(absolutePath);
   } catch (error) {
     next(error);
@@ -154,6 +158,14 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
       throw new AppError('At least one field is required', 400);
     }
 
+    // Validate field types
+    const validFieldTypes = ['signature', 'text', 'date', 'checkbox'];
+    for (const f of fields) {
+      if (!validFieldTypes.includes(f.type)) {
+        throw new AppError(`Invalid field type: ${f.type}`, 400);
+      }
+    }
+
     // Validate recipient emails
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (recipients && recipients.length > 0) {
@@ -172,39 +184,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
       throw new AppError('Document not found', 404);
     }
 
-    // Check credits
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (!user || user.credits < 1) {
-      throw new AppError('Insufficient credits. Please purchase more credits to send documents.', 402);
-    }
-
-    // Create envelope
-    const envelope = await prisma.envelope.create({
-      data: {
-        documentId: document.id,
-        userId: req.user!.userId,
-        subject,
-        message,
-        status: 'sent',
-      },
-    });
-
-    // Create recipients
-    const createdRecipients = await Promise.all(
-      (recipients || []).map((r, _i) =>
-        prisma.recipient.create({
-          data: {
-            envelopeId: envelope.id,
-            email: r.email,
-            name: r.name,
-            role: r.role || 'signer',
-            signingOrder: r.signingOrder || 1,
-          },
-        })
-      )
-    );
-
-    // Validate field indices and page numbers
+    // Validate field indices and page numbers BEFORE any DB writes
     for (const f of fields) {
       if (f.recipientIndex !== -1 && (f.recipientIndex < 0 || f.recipientIndex >= (recipients || []).length)) {
         throw new AppError('Invalid recipient index for field', 400);
@@ -214,38 +194,19 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
       }
     }
 
-    // Create fields and assign to recipients
-    await Promise.all(
-      fields.map((f) => {
-        const recipient = createdRecipients[f.recipientIndex];
-        return prisma.field.create({
-          data: {
-            envelopeId: envelope.id,
-            recipientId: recipient ? recipient.id : null,
-            type: f.type,
-            page: f.page,
-            x: f.x,
-            y: f.y,
-            width: f.width,
-            height: f.height,
-            required: f.required ?? true,
-            placeholder: f.placeholder,
-            value: f.value || null,
-          },
-        });
-      })
-    );
-
-    // Deduct credit atomically
-    await prisma.$transaction(async (tx) => {
-      const freshUser = await tx.user.findUnique({ where: { id: req.user!.userId } });
-      if (!freshUser || freshUser.credits < 1) {
+    // Wrap entire operation in a single transaction to prevent orphaned records
+    const result = await prisma.$transaction(async (tx) => {
+      // Check and deduct credit atomically
+      const user = await tx.user.findUnique({ where: { id: req.user!.userId } });
+      if (!user || user.credits < 1) {
         throw new AppError('Insufficient credits. Please purchase more credits to send documents.', 402);
       }
+
       await tx.user.update({
         where: { id: req.user!.userId },
         data: { credits: { decrement: 1 } },
       });
+
       await tx.creditTransaction.create({
         data: {
           userId: req.user!.userId,
@@ -254,37 +215,90 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
           description: `Sent: ${subject}`,
         },
       });
+
+      // Create envelope
+      const envelope = await tx.envelope.create({
+        data: {
+          documentId: document.id,
+          userId: req.user!.userId,
+          subject,
+          message,
+          status: 'sent',
+        },
+      });
+
+      // Create recipients
+      const createdRecipients = await Promise.all(
+        (recipients || []).map((r) =>
+          tx.recipient.create({
+            data: {
+              envelopeId: envelope.id,
+              email: r.email,
+              name: r.name,
+              role: r.role || 'signer',
+              signingOrder: r.signingOrder || 1,
+            },
+          })
+        )
+      );
+
+      // Create fields and assign to recipients
+      await Promise.all(
+        fields.map((f) => {
+          const recipient = f.recipientIndex >= 0 ? createdRecipients[f.recipientIndex] : null;
+          return tx.field.create({
+            data: {
+              envelopeId: envelope.id,
+              recipientId: recipient ? recipient.id : null,
+              type: f.type,
+              page: f.page,
+              x: f.x,
+              y: f.y,
+              width: f.width,
+              height: f.height,
+              required: f.required ?? true,
+              placeholder: f.placeholder,
+              value: f.value || null,
+            },
+          });
+        })
+      );
+
+      // If no signers, mark completed
+      const hasSigners = createdRecipients.some((r) => r.role === 'signer');
+      if (!hasSigners) {
+        await tx.envelope.update({
+          where: { id: envelope.id },
+          data: { status: 'completed', completedAt: new Date() },
+        });
+        await tx.document.update({
+          where: { id: document.id },
+          data: { status: 'completed' },
+        });
+      } else {
+        await tx.document.update({
+          where: { id: document.id },
+          data: { status: 'sent' },
+        });
+      }
+
+      return { envelope, createdRecipients, hasSigners };
     });
 
-    // If no recipients (self-fill only), generate final PDF and mark completed
-    const hasSigners = createdRecipients.some((r) => r.role === 'signer');
-    if (!hasSigners) {
-      const allFields = await prisma.field.findMany({ where: { envelopeId: envelope.id } });
+    // Generate final PDF outside transaction if no signers (self-fill only)
+    if (!result.hasSigners) {
+      const allFields = await prisma.field.findMany({ where: { envelopeId: result.envelope.id } });
       const fieldsForPdf = allFields.map((f) => ({
         id: f.id, type: f.type, page: f.page,
         x: f.x, y: f.y, width: f.width, height: f.height, value: f.value,
       }));
       const { saveFinalPdf } = await import('../services/pdf.service');
       await saveFinalPdf(document.filePath, fieldsForPdf, uploadDir);
-
-      await prisma.envelope.update({
-        where: { id: envelope.id },
-        data: { status: 'completed', completedAt: new Date() },
-      });
-      await prisma.document.update({
-        where: { id: document.id },
-        data: { status: 'completed' },
-      });
-    } else {
-      await prisma.document.update({
-        where: { id: document.id },
-        data: { status: 'sent' },
-      });
     }
 
     // Return envelope with signing links
     const fullEnvelope = await prisma.envelope.findUnique({
-      where: { id: envelope.id },
+      where: { id: result.envelope.id },
       include: {
         recipients: true,
         fields: true,
@@ -292,7 +306,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
     });
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
-    const signingLinks = createdRecipients.map((r) => ({
+    const signingLinks = result.createdRecipients.map((r) => ({
       recipientName: r.name,
       recipientEmail: r.email,
       signingUrl: `${frontendUrl}/sign/${r.uniqueLink}`,
@@ -318,11 +332,18 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
       throw new AppError('Document not found', 404);
     }
 
-    // Delete file from disk
+    // Delete original and signed PDF from disk
     try {
       await fs.unlink(document.filePath);
     } catch {
       // File may not exist
+    }
+    try {
+      const baseName = path.basename(document.filePath, '.pdf');
+      const signedPath = path.join(uploadDir, `${baseName}_signed.pdf`);
+      await fs.unlink(signedPath);
+    } catch {
+      // Signed file may not exist
     }
 
     await prisma.document.delete({ where: { id: document.id } });

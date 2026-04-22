@@ -33,6 +33,10 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       throw new AppError('Name and signature data are required', 400);
     }
 
+    if (signatureData.length > 500000) {
+      throw new AppError('Signature data too large (max 500KB)', 400);
+    }
+
     if (isDefault) {
       await prisma.signature.updateMany({
         where: { userId: req.user!.userId, isDefault: true },

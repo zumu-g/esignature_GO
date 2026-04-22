@@ -31,7 +31,7 @@ class ErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="min-h-dvh flex items-center justify-center bg-gray-50">
           <div className="max-w-md w-full bg-white rounded-lg border border-gray-200 p-6 text-center">
             <h2 className="text-lg font-bold text-gray-900 mb-2">Something went wrong</h2>
             <p className="text-sm text-gray-500 mb-4">
@@ -59,13 +59,19 @@ function PrivateRoute({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-dvh">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
       </div>
     );
   }
 
   return token ? <>{children}</> : <Navigate to="/login" />;
+}
+
+function PublicRoute({ children }: { children: ReactNode }) {
+  const { token, loading } = useAuthStore();
+  if (loading) return null;
+  return token ? <Navigate to="/" /> : <>{children}</>;
 }
 
 export default function App() {
@@ -78,8 +84,8 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/sign/:link" element={<SigningView />} />
         <Route
           path="/"
@@ -93,6 +99,7 @@ export default function App() {
           <Route path="prepare/:id" element={<DocumentPrepare />} />
           <Route path="credits" element={<Credits />} />
         </Route>
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </ErrorBoundary>
   );

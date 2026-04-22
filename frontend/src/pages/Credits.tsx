@@ -9,17 +9,24 @@ import { CreditCoinIllustration } from '../components/Illustrations';
 export default function Credits() {
   const [packs, setPacks] = useState<CreditPack[]>([]);
   const [history, setHistory] = useState<CreditTransaction[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<string | null>(null);
+  const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState('');
   const { user, updateCredits } = useAuthStore();
 
   useEffect(() => {
-    api.getCredits().then((data) => setPacks(data.packs));
-    api.getCreditHistory().then(setHistory);
+    Promise.all([
+      api.getCredits().then((data) => setPacks(data.packs)),
+      api.getCreditHistory().then(setHistory),
+    ]).catch((err) => {
+      setError(err instanceof Error ? err.message : 'Failed to load credits');
+    }).finally(() => {
+      setLoadingData(false);
+    });
   }, []);
 
   const handlePurchase = async (packId: string) => {
-    setLoading(true);
+    setLoading(packId);
     setError('');
     try {
       const result = await api.purchaseCredits(packId);
@@ -34,7 +41,7 @@ export default function Credits() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Purchase failed');
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   };
 
@@ -61,6 +68,12 @@ export default function Credits() {
       )}
 
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Buy Credits</h2>
+      {loadingData ? (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2" />
+          <p className="text-sm text-gray-500">Loading credit packs...</p>
+        </div>
+      ) : (
       <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {packs.map((pack) => {
           const pricePerCredit = (pack.price / 100 / pack.credits).toFixed(2);
@@ -72,56 +85,85 @@ export default function Credits() {
                 <div className="text-xs text-gray-500 mb-4">${pricePerCredit} per credit</div>
                 <MotionButton
                   onClick={() => handlePurchase(pack.id)}
-                  disabled={loading}
+                  disabled={!!loading}
                   className="w-full bg-blue-600 text-white py-2.5 rounded-md text-sm font-medium hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 transition-colors duration-150"
                 >
-                  {loading ? 'Processing...' : 'Purchase'}
+                  {loading === pack.id ? 'Processing...' : 'Purchase'}
                 </MotionButton>
               </MotionCard>
             </StaggerItem>
           );
         })}
       </StaggerList>
+      )}
 
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Transaction History</h2>
       {history.length === 0 ? (
         <p className="text-sm text-gray-500">No transactions yet</p>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Type</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Description</th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Credits</th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {history.map((tx, index) => (
-                <motion.tr key={tx.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.05 }}>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      {tx.amount > 0 ? (
-                        <ArrowUpRight className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <ArrowDownRight className="h-4 w-4 text-red-500" />
-                      )}
-                      <span className="text-sm capitalize">{tx.transactionType}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{tx.description || '-'}</td>
-                  <td className={`px-4 py-3 text-sm text-right font-medium ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Type</th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Description</th>
+                  <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Credits</th>
+                  <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {history.map((tx, index) => (
+                  <motion.tr key={tx.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.05 }}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {tx.amount > 0 ? (
+                          <ArrowUpRight className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <ArrowDownRight className="h-4 w-4 text-red-500" />
+                        )}
+                        <span className="text-sm capitalize">{tx.transactionType}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{tx.description || '-'}</td>
+                    <td className={`px-4 py-3 text-sm text-right font-medium ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {tx.amount > 0 ? '+' : ''}{tx.amount}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 text-right">
+                      {new Date(tx.createdAt).toLocaleDateString()}
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2">
+            {history.map((tx, index) => (
+              <motion.div key={tx.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.05 }} className="bg-white rounded-lg border border-gray-200 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {tx.amount > 0 ? (
+                      <ArrowUpRight className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <ArrowDownRight className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className="text-sm font-medium capitalize">{tx.transactionType}</span>
+                  </div>
+                  <span className={`text-sm font-bold ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {tx.amount > 0 ? '+' : ''}{tx.amount}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 text-right">
-                    {new Date(tx.createdAt).toLocaleDateString()}
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1 text-xs text-gray-500">
+                  <span>{tx.description || '-'}</span>
+                  <span>{new Date(tx.createdAt).toLocaleDateString()}</span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </>
       )}
     </PageEntrance>
   );

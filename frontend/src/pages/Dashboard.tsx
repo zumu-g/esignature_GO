@@ -216,13 +216,13 @@ export default function Dashboard() {
                           </button>
                         )}
                         {doc.status === 'completed' && (
-                          <a
-                            href={api.downloadDocument(doc.id)}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); api.downloadDocument(doc.id).catch((err) => setError(err.message)); }}
                             className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors duration-150"
                             aria-label="Download signed PDF"
                           >
                             <Download className="h-4 w-4" />
-                          </a>
+                          </button>
                         )}
                         <button
                           onClick={() => handleDelete(doc.id)}
@@ -274,9 +274,9 @@ export default function Dashboard() {
                         </button>
                       )}
                       {doc.status === 'completed' && (
-                        <a href={api.downloadDocument(doc.id)} className="p-1.5 text-gray-400 hover:text-green-600 rounded" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={(e) => { e.stopPropagation(); api.downloadDocument(doc.id).catch((err) => setError(err.message)); }} className="p-1.5 text-gray-400 hover:text-green-600 rounded">
                           <Download className="h-4 w-4" />
-                        </a>
+                        </button>
                       )}
                       <button onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }} className="p-1.5 text-gray-400 hover:text-red-600 rounded">
                         <Trash2 className="h-4 w-4" />

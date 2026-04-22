@@ -15,6 +15,14 @@ import 'react-pdf/dist/Page/TextLayer.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+// UUID fallback for iOS < 15.4
+const generateId = (): string =>
+  crypto.randomUUID?.() ??
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+
 interface PlacedField {
   id: string;
   type: string;
@@ -57,12 +65,21 @@ export default function DocumentPrepare() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [signingLinks, setSigningLinks] = useState<{ recipientName: string; signingUrl: string }[] | null>(null);
-  const [pdfWidth, setPdfWidth] = useState(612);
+  const [viewportWidth, setViewportWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 612);
   const [draggingField, setDraggingField] = useState<string | null>(null);
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [draggingPlacedField, setDraggingPlacedField] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
+
+  // Responsive PDF width — constrain to viewport on mobile
+  const pdfWidth = Math.min(612, viewportWidth - 32);
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const [loadingDoc, setLoadingDoc] = useState(true);
   const [showSmartFill, setShowSmartFill] = useState(false);
@@ -113,20 +130,20 @@ export default function DocumentPrepare() {
     const y = e.clientY - rect.top - fieldType.height / 2;
 
     const newField: PlacedField = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       type: baseType,
-      page: currentPage - 1,
+      page: currentPage,
       x: Math.max(0, Math.min(x, pdfWidth - fieldType.width)),
       y: Math.max(0, y),
       width: fieldType.width,
       height: fieldType.height,
       recipientIndex: isSelfFill ? -1 : 0,
-      value: isSelfFill && baseType === 'date' ? new Date().toLocaleDateString() : '',
+      value: isSelfFill && baseType === 'date' ? new Date().toISOString().split('T')[0] : '',
     };
 
     setFields((prev) => [...prev, newField]);
     setDraggingField(null);
-  }, [draggingField, currentPage, pdfWidth]);
+  }, [draggingField, draggingPlacedField, currentPage, pdfWidth]);
 
   const removeField = (fieldId: string) => {
     setFields((prev) => prev.filter((f) => f.id !== fieldId));
@@ -166,9 +183,9 @@ export default function DocumentPrepare() {
     const newFields: PlacedField[] = answered.map((f, i) => {
       const size = FIELD_SIZES[f.fieldType] || FIELD_SIZES.text;
       return {
-        id: crypto.randomUUID(),
+        id: generateId(),
         type: f.fieldType,
-        page: currentPage - 1,
+        page: currentPage,
         x: 60,
         y: startY + i * spacing,
         width: size.width,
@@ -262,7 +279,8 @@ export default function DocumentPrepare() {
       });
 
       setSigningLinks(result.signingLinks);
-      updateCredits((user?.credits ?? 1) - 1);
+      // Re-fetch user to get accurate credit balance from server
+      useAuthStore.getState().loadUser();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send');
     } finally {
@@ -343,7 +361,7 @@ export default function DocumentPrepare() {
     );
   }
 
-  const pageFields = fields.filter((f) => f.page === currentPage - 1);
+  const pageFields = fields.filter((f) => f.page === currentPage);
 
   return (
     <PageEntrance>
@@ -464,8 +482,8 @@ export default function DocumentPrepare() {
             <Users className="h-4 w-4" />
             Recipients
           </h3>
-          <button onClick={addRecipient} className="text-blue-600 hover:text-blue-700">
-            <Plus className="h-4 w-4" />
+          <button onClick={addRecipient} className="text-blue-600 hover:text-blue-700 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Add recipient">
+            <Plus className="h-5 w-5" />
           </button>
         </div>
 
@@ -476,8 +494,8 @@ export default function DocumentPrepare() {
                 <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: RECIPIENT_COLORS[i % RECIPIENT_COLORS.length] }} />
                 <span className="text-xs font-medium text-gray-500">Recipient {i + 1}</span>
                 {recipients.length > 1 && (
-                  <button onClick={() => removeRecipient(i)} className="ml-auto text-gray-400 hover:text-red-500">
-                    <Trash2 className="h-3 w-3" />
+                  <button onClick={() => removeRecipient(i)} className="ml-auto text-gray-400 hover:text-red-500 p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center" aria-label={`Remove recipient ${i + 1}`}>
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
@@ -546,7 +564,8 @@ export default function DocumentPrepare() {
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
-              className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 disabled:opacity-30"
+              aria-label="Previous page"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -556,17 +575,31 @@ export default function DocumentPrepare() {
             <button
               onClick={() => setCurrentPage((p) => Math.min(doc.pageCount, p + 1))}
               disabled={currentPage >= doc.pageCount}
-              className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 disabled:opacity-30"
+              aria-label="Next page"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
         </div>
 
+        {/* Mobile placement mode indicator */}
+        {draggingField && (
+          <div className="lg:hidden text-center mb-2 px-4">
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium animate-pulse ${
+              draggingField.startsWith('self-')
+                ? 'bg-green-100 text-green-700'
+                : 'bg-blue-100 text-blue-700'
+            }`}>
+              Tap on the document to place {draggingField.replace('self-', '')} field
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-center">
           <div
             ref={pageRef}
-            className="relative bg-white shadow-lg cursor-crosshair"
+            className={`relative bg-white shadow-lg ${draggingField ? 'cursor-crosshair ring-2 ring-blue-300 ring-offset-2' : ''}`}
             onClick={handlePageClick}
           >
             <PdfDocument
@@ -579,7 +612,7 @@ export default function DocumentPrepare() {
                 width={pdfWidth}
                 renderTextLayer={false}
                 renderAnnotationLayer={true}
-                onLoadSuccess={(page) => setPdfWidth(page.width)}
+                onLoadSuccess={() => {}}
               />
             </PdfDocument>
 
@@ -609,14 +642,14 @@ export default function DocumentPrepare() {
                     );
                     setTimeout(() => setDraggingPlacedField(null), 50);
                   }}
-                  className={`absolute border-2 rounded flex items-center cursor-grab active:cursor-grabbing select-none ${
+                  className={`absolute border-2 rounded flex items-center cursor-grab active:cursor-grabbing select-none touch-none ${
                     selectedField === field.id ? 'ring-2 ring-offset-1 ring-blue-400' : ''
                   } ${isSelfFill ? 'border-dashed' : ''}`}
                   style={{
                     left: field.x,
                     top: field.y,
                     width: field.width,
-                    height: field.height,
+                    height: Math.max(field.height, 30),
                     borderColor: color,
                     backgroundColor: isSelfFill ? '#05966910' : `${color}15`,
                   }}
@@ -684,9 +717,10 @@ export default function DocumentPrepare() {
                           e.stopPropagation();
                           removeField(field.id);
                         }}
-                        className="bg-red-500 text-white rounded p-0.5"
+                        className="bg-red-500 text-white rounded p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center"
+                        aria-label="Delete field"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   )}
