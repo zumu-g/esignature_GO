@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import { saveFinalPdf } from '../services/pdf.service';
 import { AppError } from '../middleware/error';
+import { sendSigningComplete } from '../services/email.service';
 import prisma from '../db';
 
 const router = Router();
@@ -262,6 +263,17 @@ router.post('/:link/complete', async (req: Request, res: Response, next: NextFun
         x: f.x, y: f.y, width: f.width, height: f.height, value: f.value,
       }));
       await saveFinalPdf(recipient.envelope.document.filePath, fieldsForPdf, uploadDir);
+
+      // Notify document owner that all signing is complete
+      const owner = await prisma.user.findUnique({ where: { id: recipient.envelope.userId } });
+      if (owner) {
+        sendSigningComplete({
+          ownerEmail: owner.email,
+          ownerName: `${owner.firstName} ${owner.lastName}`.trim(),
+          recipientName: recipient.name,
+          documentTitle: recipient.envelope.document.name,
+        }).catch((err) => console.error('[email] Failed to send completion notice:', err.message));
+      }
     }
 
     res.json({

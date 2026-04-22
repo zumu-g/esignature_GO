@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getPageCount } from '../services/pdf.service';
 import { AppError } from '../middleware/error';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { sendSigningRequest } from '../services/email.service';
 import prisma from '../db';
 
 const router = Router();
@@ -282,7 +283,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
         });
       }
 
-      return { envelope, createdRecipients, hasSigners };
+      return { envelope, createdRecipients, hasSigners, senderName: `${user.firstName} ${user.lastName}`.trim(), senderEmail: user.email };
     });
 
     // Generate final PDF outside transaction if no signers (self-fill only)
@@ -311,6 +312,20 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
       recipientEmail: r.email,
       signingUrl: `${frontendUrl}/sign/${r.uniqueLink}`,
     }));
+
+    // Send signing request emails (fire-and-forget — don't fail the request if email fails)
+    const signers = result.createdRecipients.filter((r) => r.role === 'signer');
+    for (const signer of signers) {
+      sendSigningRequest({
+        recipientName: signer.name,
+        recipientEmail: signer.email,
+        senderName: result.senderName || 'Someone',
+        documentTitle: document.name,
+        subject,
+        message,
+        signingUrl: `${frontendUrl}/sign/${signer.uniqueLink}`,
+      }).catch((err) => console.error('[email] Failed to send signing request:', err.message));
+    }
 
     res.status(201).json({
       envelope: fullEnvelope,
