@@ -5,8 +5,26 @@ import { api } from '../lib/api';
 import type { Document } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { Upload, FileText, Clock, CheckCircle, Send, Trash2, Download, Link as LinkIcon, Loader2, Eye } from 'lucide-react';
-import { PageEntrance, StaggerList, StaggerItem, MotionButton, FadeIn } from '../components/Motion';
-import { EmptyDocumentsIllustration, UploadIllustration } from '../components/Illustrations';
+import { PageEntrance, FadeIn } from '../components/Motion';
+import { EmptyDocumentsIllustration } from '../components/Illustrations';
+
+// ─── Apple-style design tokens (inline styles where Tailwind can't express exact values) ───
+
+const STATUS_BADGE: Record<string, React.CSSProperties> = {
+  draft: { background: '#F5F5F7', color: '#6E6E73' },
+  sent: { background: 'rgba(0,113,227,0.1)', color: '#0071E3' },
+  completed: { background: 'rgba(52,199,89,0.1)', color: '#34C759' },
+  voided: { background: 'rgba(182,68,0,0.1)', color: '#B64400' },
+};
+
+const cardBase: React.CSSProperties = {
+  background: '#FFFFFF',
+  border: '1px solid #E8E8ED',
+  borderRadius: 18,
+  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+  padding: 20,
+  transition: 'box-shadow 0.2s ease-out, transform 0.2s ease-out',
+};
 
 export default function Dashboard() {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -14,6 +32,8 @@ export default function Dashboard() {
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +70,24 @@ export default function Dashboard() {
     }
   };
 
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file || file.type !== 'application/pdf') return;
+
+    setUploading(true);
+    setError('');
+    try {
+      const doc = await api.uploadDocument(file);
+      navigate(`/prepare/${doc.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleCopyLinks = (docId: string, recipients: { name: string; role: string; uniqueLink: string }[]) => {
     const links = recipients
       .filter((r) => r.role === 'signer')
@@ -70,242 +108,444 @@ export default function Dashboard() {
     }
   };
 
-  const statusIcon = (status: string) => {
+  const StatusBadge = ({ status }: { status: string }) => (
+    <span
+      style={{
+        ...(STATUS_BADGE[status] || STATUS_BADGE.draft),
+        fontSize: 12,
+        fontWeight: 600,
+        padding: '2px 8px',
+        borderRadius: 4,
+        display: 'inline-block',
+        letterSpacing: 0,
+      }}
+    >
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  );
+
+  const StatusIcon = ({ status }: { status: string }) => {
     switch (status) {
-      case 'draft': return <Clock className="h-4 w-4 text-gray-400" />;
-      case 'sent': return <Send className="h-4 w-4 text-blue-500" />;
-      case 'completed': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      default: return <FileText className="h-4 w-4 text-gray-400" />;
+      case 'draft': return <Clock className="h-4 w-4" style={{ color: '#6E6E73' }} />;
+      case 'sent': return <Send className="h-4 w-4" style={{ color: '#0071E3' }} />;
+      case 'completed': return <CheckCircle className="h-4 w-4" style={{ color: '#34C759' }} />;
+      default: return <FileText className="h-4 w-4" style={{ color: '#6E6E73' }} />;
     }
   };
 
-  const statusLabel = (status: string) => {
-    const styles: Record<string, string> = {
-      draft: 'bg-gray-100 text-gray-700',
-      sent: 'bg-blue-100 text-blue-700',
-      completed: 'bg-green-100 text-green-700',
-      voided: 'bg-red-100 text-red-700',
-    };
-    return (
-      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles[status] || styles.draft}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    );
-  };
-
   return (
-    <div>
+    <div style={{ background: '#F5F5F7', minHeight: '100vh' }}>
       <PageEntrance>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {user?.credits ?? 0} credits remaining
-          </p>
-        </div>
-        <MotionButton
-          className={`inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-blue-700 active:bg-blue-800 cursor-pointer transition-colors duration-150 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
-          disabled={uploading}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          {uploading ? 'Uploading...' : 'Upload PDF'}
-        </MotionButton>
-        <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleUpload} className="hidden" />
-      </div>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '40px 40px 60px' }}>
 
-      {error && (
-        <div className="bg-red-50 text-red-600 text-sm p-3 rounded-md mb-4">{error}</div>
-      )}
+          {/* ── Page header ── */}
+          <div className="flex items-start justify-between mb-8">
+            <div>
+              <h1 style={{ fontSize: 30, fontWeight: 600, color: '#1D1D1F', lineHeight: 1.2, margin: 0 }}>
+                Documents
+              </h1>
+              <p style={{ fontSize: 14, color: '#6E6E73', marginTop: 4 }}>
+                {user?.credits ?? 0} credit{(user?.credits ?? 0) !== 1 ? 's' : ''} remaining
+              </p>
+            </div>
 
-      {loadingDocs ? (
-        <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
-          <Loader2 className="h-8 w-8 text-gray-300 mx-auto mb-3 animate-spin" />
-          <p className="text-sm text-gray-500">Loading documents...</p>
-        </div>
-      ) : documents.length === 0 ? (
-        <FadeIn delay={0.2}>
-        <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
-          <EmptyDocumentsIllustration size={180} />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">No documents yet</h3>
-          <p className="text-sm text-gray-500 mb-4">Upload a PDF to get started</p>
-          <MotionButton
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-blue-700 active:bg-blue-800 cursor-pointer transition-colors duration-150"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="h-4 w-4" />
-            Upload PDF
-          </MotionButton>
-        </div>
-        </FadeIn>
-      ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="hidden md:block">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Document</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Status</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Recipients</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Date</th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {documents.map((doc, index) => {
-                const envelope = doc.envelopes?.[0];
-                const recipients = envelope?.recipients || [];
+            <motion.button
+              whileHover={uploading ? {} : { scale: 1.02 }}
+              whileTap={uploading ? {} : { scale: 0.97 }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: uploading ? '#6E6E73' : '#0071E3',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: 8,
+                height: 44,
+                padding: '0 24px',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: uploading ? 'not-allowed' : 'pointer',
+                transition: 'background 0.15s ease-in-out',
+              }}
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+              onMouseEnter={(e) => { if (!uploading) (e.currentTarget as HTMLElement).style.background = '#0066CC'; }}
+              onMouseLeave={(e) => { if (!uploading) (e.currentTarget as HTMLElement).style.background = '#0071E3'; }}
+            >
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {uploading ? 'Uploading…' : 'Upload PDF'}
+            </motion.button>
 
-                return (
-                  <motion.tr key={doc.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.05 }} className="hover:bg-gray-50 transition-colors duration-100 cursor-pointer" onClick={() => doc.status === 'draft' ? navigate(`/prepare/${doc.id}`) : undefined}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {statusIcon(doc.status)}
-                        <button
-                          className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors duration-150 text-left"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/prepare/${doc.id}`); }}
+            <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleUpload} className="hidden" />
+          </div>
+
+          {/* ── Error banner ── */}
+          {error && (
+            <div
+              style={{
+                background: 'rgba(182,68,0,0.08)',
+                border: '1px solid rgba(182,68,0,0.2)',
+                color: '#B64400',
+                fontSize: 14,
+                padding: '10px 16px',
+                borderRadius: 10,
+                marginBottom: 20,
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* ── Loading state ── */}
+          {loadingDocs ? (
+            <div
+              style={{
+                ...cardBase,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '64px 20px',
+              }}
+            >
+              <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#E8E8ED', marginBottom: 12 }} />
+              <p style={{ fontSize: 14, color: '#6E6E73', margin: 0 }}>Loading documents…</p>
+            </div>
+
+          /* ── Empty state ── */
+          ) : documents.length === 0 ? (
+            <FadeIn delay={0.2}>
+              <div
+                style={{
+                  ...cardBase,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '64px 20px',
+                  textAlign: 'center',
+                }}
+              >
+                <EmptyDocumentsIllustration size={160} />
+                <h3 style={{ fontSize: 21, fontWeight: 600, color: '#1D1D1F', margin: '16px 0 6px' }}>
+                  No documents yet
+                </h3>
+                <p style={{ fontSize: 15, color: '#6E6E73', margin: '0 0 24px' }}>
+                  Upload a PDF to get started
+                </p>
+
+                {/* Drop zone */}
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    border: dragOver ? '2px dashed #0071E3' : '2px dashed #E8E8ED',
+                    borderRadius: 18,
+                    background: dragOver ? 'rgba(0,113,227,0.03)' : '#F5F5F7',
+                    padding: '32px 48px',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.15s ease-in-out, background 0.15s ease-in-out',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginBottom: 20,
+                  }}
+                >
+                  <Upload className="h-8 w-8" style={{ color: dragOver ? '#0071E3' : '#6E6E73' }} />
+                  <span style={{ fontSize: 14, color: '#6E6E73' }}>Drop PDF here or click to browse</span>
+                </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: '#0071E3',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: 8,
+                    height: 44,
+                    padding: '0 24px',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#0066CC'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#0071E3'; }}
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload PDF
+                </motion.button>
+              </div>
+            </FadeIn>
+
+          /* ── Document grid ── */
+          ) : (
+            <>
+              {/* Upload drop zone strip above cards */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  border: dragOver ? '2px dashed #0071E3' : '2px dashed #E8E8ED',
+                  borderRadius: 18,
+                  background: dragOver ? 'rgba(0,113,227,0.03)' : '#F5F5F7',
+                  padding: '20px 24px',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.15s ease-in-out, background 0.15s ease-in-out',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  marginBottom: 24,
+                }}
+              >
+                <Upload className="h-5 w-5" style={{ color: dragOver ? '#0071E3' : '#6E6E73' }} />
+                <span style={{ fontSize: 14, color: dragOver ? '#0071E3' : '#6E6E73' }}>
+                  Drop a PDF here or click to browse
+                </span>
+              </div>
+
+              {/* Section heading */}
+              <h2 style={{ fontSize: 21, fontWeight: 600, color: '#1D1D1F', marginBottom: 16 }}>
+                All Documents
+              </h2>
+
+              {/* Card grid — 3 col desktop / 2 col tablet / 1 col mobile */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                  gap: 24,
+                }}
+              >
+                {documents.map((doc, index) => {
+                  const envelope = doc.envelopes?.[0];
+                  const recipients = envelope?.recipients || [];
+                  const isHovered = hoveredCard === doc.id;
+
+                  return (
+                    <motion.div
+                      key={doc.id}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.35, delay: index * 0.06, ease: 'easeOut' }}
+                      style={{
+                        ...cardBase,
+                        boxShadow: isHovered
+                          ? '0 6px 20px rgba(0,0,0,0.1)'
+                          : '0 2px 10px rgba(0,0,0,0.05)',
+                        transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+                        cursor: doc.status === 'draft' ? 'pointer' : 'default',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 0,
+                      }}
+                      onMouseEnter={() => setHoveredCard(doc.id)}
+                      onMouseLeave={() => setHoveredCard(null)}
+                      onClick={() => doc.status === 'draft' ? navigate(`/prepare/${doc.id}`) : undefined}
+                    >
+                      {/* Card top: icon area + status badge */}
+                      <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                        <div
+                          style={{
+                            background: '#F5F5F7',
+                            borderRadius: 12,
+                            width: 40,
+                            height: 40,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
                         >
-                          {doc.name}
-                        </button>
-                        <span className="text-xs text-gray-400">{doc.pageCount} pg</span>
-                        {doc.status === 'draft' && <span className="text-xs text-blue-500">click to edit</span>}
+                          <StatusIcon status={doc.status} />
+                        </div>
+                        <StatusBadge status={doc.status} />
                       </div>
-                    </td>
-                    <td className="px-4 py-3">{statusLabel(doc.status)}</td>
-                    <td className="px-4 py-3">
-                      {recipients.length > 0 ? (
-                        <div className="text-sm text-gray-600">
+
+                      {/* Document name */}
+                      <button
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: 15,
+                          fontWeight: 600,
+                          color: '#1D1D1F',
+                          lineHeight: 1.3,
+                          marginBottom: 4,
+                          width: '100%',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/prepare/${doc.id}`); }}
+                      >
+                        {doc.name}
+                      </button>
+
+                      {/* Meta row: page count + date */}
+                      <div className="flex items-center gap-2" style={{ marginBottom: 12 }}>
+                        <span style={{ fontSize: 12, color: '#6E6E73' }}>
+                          {doc.pageCount} {doc.pageCount === 1 ? 'page' : 'pages'}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#E8E8ED' }}>·</span>
+                        <span style={{ fontSize: 12, color: '#6E6E73' }}>
+                          {new Date(doc.createdAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </span>
+                      </div>
+
+                      {/* Recipients */}
+                      {recipients.length > 0 && (
+                        <div
+                          style={{
+                            borderTop: '1px solid #E8E8ED',
+                            paddingTop: 10,
+                            marginBottom: 12,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 4,
+                          }}
+                        >
                           {recipients.map((r) => (
-                            <div key={r.id} className="flex items-center gap-1">
-                              <span>{r.name}</span>
+                            <div key={r.id} className="flex items-center gap-1.5">
+                              <span style={{ fontSize: 13, color: '#1D1D1F' }}>{r.name}</span>
                               {r.status === 'signed' ? (
-                                <CheckCircle className="h-3 w-3 text-green-500" />
+                                <CheckCircle className="h-3.5 w-3.5" style={{ color: '#34C759' }} />
                               ) : r.status === 'viewed' ? (
-                                <Eye className="h-3 w-3 text-blue-500" />
+                                <Eye className="h-3.5 w-3.5" style={{ color: '#0071E3' }} />
                               ) : (
-                                <Clock className="h-3 w-3 text-gray-400" />
+                                <Clock className="h-3.5 w-3.5" style={{ color: '#6E6E73' }} />
                               )}
                             </div>
                           ))}
                         </div>
-                      ) : (
-                        <span className="text-xs text-gray-400">-</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {new Date(doc.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-0.5">
-                        {doc.status === 'draft' && (
-                          <button
-                            onClick={() => navigate(`/prepare/${doc.id}`)}
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors duration-150"
-                            aria-label="Prepare and send document"
-                          >
-                            <Send className="h-4 w-4" />
-                          </button>
-                        )}
-                        {doc.status === 'sent' && envelope && (
-                          <button
-                            onClick={() => handleCopyLinks(doc.id, recipients)}
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors duration-150"
-                            aria-label="Copy signing links"
-                          >
-                            {copied === doc.id ? <CheckCircle className="h-4 w-4 text-green-500" /> : <LinkIcon className="h-4 w-4" />}
-                          </button>
-                        )}
-                        {doc.status === 'completed' && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); api.downloadDocument(doc.id).catch((err) => setError(err.message)); }}
-                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors duration-150"
-                            aria-label="Download signed PDF"
-                          >
-                            <Download className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(doc.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors duration-150"
-                          aria-label="Delete document"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
 
-          <div className="md:hidden space-y-2 p-2">
-            {documents.map((doc, index) => {
-              const envelope = doc.envelopes?.[0];
-              const recipients = envelope?.recipients || [];
-              return (
-                <motion.div
-                  key={doc.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                  className="bg-white rounded-lg border border-gray-200 p-3"
-                  onClick={() => doc.status === 'draft' ? navigate(`/prepare/${doc.id}`) : undefined}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {statusIcon(doc.status)}
-                      <span className="text-sm font-medium text-gray-900 truncate">{doc.name}</span>
-                    </div>
-                    {statusLabel(doc.status)}
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>{doc.pageCount} pages &middot; {new Date(doc.createdAt).toLocaleDateString()}</span>
-                    <div className="flex items-center gap-1">
-                      {doc.status === 'draft' && (
-                        <button onClick={(e) => { e.stopPropagation(); navigate(`/prepare/${doc.id}`); }} className="p-1.5 text-gray-400 hover:text-blue-600 rounded">
-                          <Send className="h-4 w-4" />
-                        </button>
-                      )}
-                      {doc.status === 'sent' && envelope && (
-                        <button onClick={(e) => { e.stopPropagation(); handleCopyLinks(doc.id, recipients); }} className="p-1.5 text-gray-400 hover:text-blue-600 rounded">
-                          {copied === doc.id ? <CheckCircle className="h-4 w-4 text-green-500" /> : <LinkIcon className="h-4 w-4" />}
-                        </button>
-                      )}
-                      {doc.status === 'completed' && (
-                        <button onClick={(e) => { e.stopPropagation(); api.downloadDocument(doc.id).catch((err) => setError(err.message)); }} className="p-1.5 text-gray-400 hover:text-green-600 rounded">
-                          <Download className="h-4 w-4" />
-                        </button>
-                      )}
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }} className="p-1.5 text-gray-400 hover:text-red-600 rounded">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                  {recipients.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
-                      {recipients.map((r) => (
-                        <span key={r.id} className="mr-2 inline-flex items-center gap-0.5">
-                          {r.name}
-                          {r.status === 'signed' ? (
-                            <CheckCircle className="h-3 w-3 text-green-500 inline" />
-                          ) : r.status === 'viewed' ? (
-                            <Eye className="h-3 w-3 text-blue-500 inline" />
-                          ) : (
-                            <Clock className="h-3 w-3 text-gray-400 inline" />
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
+                      {/* Action buttons */}
+                      <div
+                        className="flex items-center gap-1"
+                        style={{ marginTop: 'auto', paddingTop: recipients.length > 0 ? 0 : 10, borderTop: recipients.length > 0 ? 'none' : '1px solid #E8E8ED' }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {doc.status === 'draft' && (
+                          <ActionButton
+                            label="Prepare & send"
+                            icon={<Send className="h-4 w-4" />}
+                            variant="primary"
+                            onClick={() => navigate(`/prepare/${doc.id}`)}
+                          />
+                        )}
+
+                        {doc.status === 'sent' && envelope && (
+                          <ActionButton
+                            label={copied === doc.id ? 'Copied!' : 'Copy links'}
+                            icon={copied === doc.id
+                              ? <CheckCircle className="h-4 w-4" style={{ color: '#34C759' }} />
+                              : <LinkIcon className="h-4 w-4" />}
+                            variant="secondary"
+                            onClick={() => handleCopyLinks(doc.id, recipients)}
+                          />
+                        )}
+
+                        {doc.status === 'completed' && (
+                          <ActionButton
+                            label="Download"
+                            icon={<Download className="h-4 w-4" />}
+                            variant="secondary"
+                            onClick={() => api.downloadDocument(doc.id).catch((err) => setError(err.message))}
+                          />
+                        )}
+
+                        <div style={{ marginLeft: 'auto' }}>
+                          <ActionButton
+                            label="Delete"
+                            icon={<Trash2 className="h-4 w-4" />}
+                            variant="danger"
+                            onClick={() => handleDelete(doc.id)}
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
-      )}
       </PageEntrance>
     </div>
+  );
+}
+
+// ─── Reusable action button ───────────────────────────────────────────────────
+
+interface ActionButtonProps {
+  label: string;
+  icon: React.ReactNode;
+  variant: 'primary' | 'secondary' | 'danger';
+  onClick: () => void;
+}
+
+function ActionButton({ label, icon, variant, onClick }: ActionButtonProps) {
+  const [hovered, setHovered] = useState(false);
+
+  const base: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    border: 'none',
+    borderRadius: 8,
+    height: 36,
+    padding: '0 14px',
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'background 0.15s ease-in-out, color 0.15s ease-in-out',
+    whiteSpace: 'nowrap',
+  };
+
+  const variantStyles: Record<string, React.CSSProperties> = {
+    primary: {
+      background: hovered ? '#0066CC' : '#0071E3',
+      color: '#FFFFFF',
+    },
+    secondary: {
+      background: hovered ? '#E8E8ED' : '#F5F5F7',
+      color: '#1D1D1F',
+      border: '1px solid #E8E8ED',
+    },
+    danger: {
+      background: hovered ? 'rgba(182,68,0,0.15)' : 'rgba(182,68,0,0.08)',
+      color: '#B64400',
+      border: '1px solid rgba(182,68,0,0.15)',
+    },
+  };
+
+  return (
+    <button
+      style={{ ...base, ...variantStyles[variant] }}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }

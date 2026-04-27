@@ -150,32 +150,114 @@ export default function SigningView() {
     }
   };
 
+  // ── Error state (no document loaded) ────────────────────────────────────────
   if (error && !signingDoc) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full bg-white rounded-lg border border-gray-200 p-6 text-center">
-          <div className="text-red-500 text-lg font-medium mb-2">Unable to load document</div>
-          <p className="text-sm text-gray-500">{error}</p>
+      <div
+        style={{
+          minHeight: '100dvh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#F5F5F7',
+          padding: 16,
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 420,
+            width: '100%',
+            background: '#FFFFFF',
+            border: '1px solid #E8E8ED',
+            borderRadius: 18,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+            padding: '40px 32px',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: '#FFF2ED',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px',
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#B64400" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#1D1D1F', marginBottom: 8 }}>
+            Unable to load document
+          </div>
+          <p style={{ fontSize: 14, color: '#6E6E73' }}>{error}</p>
         </div>
       </div>
     );
   }
 
+  // ── Success / completed state ────────────────────────────────────────────────
   if (completed) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-gray-50">
-        <SuccessEntrance className="max-w-md w-full bg-white rounded-lg border border-gray-200 p-6 text-center">
-          <SuccessIllustration size={140} className="mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Document Signed!</h2>
-          <p className="text-sm text-gray-500">
+      <div
+        style={{
+          minHeight: '100dvh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#F5F5F7',
+          padding: 16,
+        }}
+      >
+        <SuccessEntrance
+          style={{
+            maxWidth: 440,
+            width: '100%',
+            background: '#FFFFFF',
+            border: '1px solid #E8E8ED',
+            borderRadius: 18,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+            padding: '48px 40px',
+            textAlign: 'center',
+          }}
+        >
+          {/* Large green checkmark */}
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: '50%',
+              background: '#34C759',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 12px',
+            }}
+          >
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+              <path d="M8 18l7 7 13-13" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          <SuccessIllustration size={100} className="mx-auto mb-2" />
+
+          <h2 style={{ fontSize: 26, fontWeight: 700, color: '#1D1D1F', marginBottom: 12 }}>
+            Document Signed
+          </h2>
+          <p style={{ fontSize: 15, color: '#6E6E73', lineHeight: 1.5, maxWidth: 320, margin: '0 auto' }}>
             {allComplete
               ? 'All parties have signed. The completed document will be sent to everyone.'
-              : 'Your signature has been recorded. Waiting for other signers to complete.'
-            }
+              : 'Your signature has been recorded. Waiting for other signers to complete.'}
           </p>
+
           {!allComplete && (
-            <div className="mt-4">
-              <WaitingIllustration size={100} className="mx-auto" />
+            <div style={{ marginTop: 28 }}>
+              <WaitingIllustration size={90} className="mx-auto" />
+              <p style={{ fontSize: 13, color: '#6E6E73', marginTop: 12 }}>Waiting for remaining signers…</p>
             </div>
           )}
         </SuccessEntrance>
@@ -183,10 +265,28 @@ export default function SigningView() {
     );
   }
 
+  // ── Loading state ────────────────────────────────────────────────────────────
   if (!signingDoc) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      <div
+        style={{
+          minHeight: '100dvh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#F5F5F7',
+        }}
+      >
+        <div
+          className="animate-spin"
+          style={{
+            width: 36,
+            height: 36,
+            border: '3px solid #E8E8ED',
+            borderTopColor: '#0071E3',
+            borderRadius: '50%',
+          }}
+        />
       </div>
     );
   }
@@ -196,159 +296,476 @@ export default function SigningView() {
   const totalRequired = signingDoc.fields.filter((f) => f.required).length;
 
   return (
-    <PageEntrance className="min-h-dvh bg-gray-100">
-      {/* Header — sticky so submit button is always reachable */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-lg font-bold text-blue-600">
-              <PenTool className="h-5 w-5" />
-              eSignatureGO
+    <PageEntrance style={{ minHeight: '100dvh', background: '#F5F5F7', display: 'flex', flexDirection: 'column' }}>
+
+      {/* ── Top bar ──────────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E8E8ED',
+          height: 56,
+          position: 'sticky',
+          top: 0,
+          zIndex: 40,
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 20px',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 900,
+            width: '100%',
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+          }}
+        >
+          {/* Left: branding + doc info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <PenTool style={{ width: 18, height: 18, color: '#0071E3' }} />
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#0071E3' }}>eSignatureGO</span>
             </div>
-            <p className="text-xs text-gray-500">
-              {signingDoc.subject} - Signing as {signingDoc.recipientName}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">
-              {filledCount}/{totalRequired} fields completed
-            </span>
-            <MotionButton
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="bg-green-600 text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-green-700 active:bg-green-800 disabled:opacity-50 transition-colors duration-150 flex items-center gap-1.5"
-            >
-              <Check className="h-4 w-4" />
-              {submitting ? 'Submitting...' : 'Finish Signing'}
-            </MotionButton>
-          </div>
-        </div>
-      </div>
-
-      {error && (
-        <div className="max-w-4xl mx-auto mt-4 px-4">
-          <div className="bg-red-50 text-red-600 text-sm p-3 rounded-md">{error}</div>
-        </div>
-      )}
-
-      {/* Message */}
-      {signingDoc.message && (
-        <div className="max-w-4xl mx-auto mt-4 px-4">
-          <div className="bg-blue-50 text-blue-700 text-sm p-3 rounded-md">
-            {signingDoc.message}
-          </div>
-        </div>
-      )}
-
-      {/* Page navigation */}
-      <div className="max-w-4xl mx-auto flex items-center justify-center gap-3 py-3">
-        <button
-          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          disabled={currentPage <= 1}
-          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 disabled:opacity-30"
-          aria-label="Previous page"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <span className="text-sm text-gray-600">
-          Page {currentPage} of {signingDoc.pageCount}
-        </span>
-        <button
-          onClick={() => setCurrentPage((p) => Math.min(signingDoc.pageCount, p + 1))}
-          disabled={currentPage >= signingDoc.pageCount}
-          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 disabled:opacity-30"
-          aria-label="Next page"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-      </div>
-
-      {/* PDF with fields */}
-      <div className="flex justify-center pb-8 px-4">
-        <div className="relative bg-white shadow-lg">
-          <PdfDocument
-            file={`/api/sign/${link}/pdf`}
-            loading={<div style={{ width: pdfWidth, height: pdfWidth * (792 / 612) }} className="bg-gray-100 animate-pulse" />}
-          >
-            <Page pageNumber={currentPage} width={pdfWidth} renderTextLayer={true} renderAnnotationLayer={true} />
-          </PdfDocument>
-
-          {/* Field overlays — scaled to match responsive PDF width */}
-          {pageFields.map((field) => {
-            const fieldValue = fieldValues.find((fv) => fv.id === field.id);
-            const isFilled = !!fieldValue?.value;
-            const scale = pdfWidth / 612;
-
-            return (
+            <div
+              style={{
+                width: 1,
+                height: 20,
+                background: '#E8E8ED',
+                flexShrink: 0,
+              }}
+            />
+            <div style={{ minWidth: 0 }}>
               <div
-                key={field.id}
-                className={`absolute border-2 rounded cursor-pointer transition-colors ${
-                  isFilled ? 'border-green-400 bg-green-50/50' : 'border-blue-400 bg-blue-50/50 hover:bg-blue-100/50'
-                }`}
                 style={{
-                  left: field.x * scale,
-                  top: field.y * scale,
-                  width: field.width * scale,
-                  height: field.height * scale,
-                }}
-                onClick={() => {
-                  if (field.type === 'signature') {
-                    setShowSignPad(field.id);
-                    // Clear canvas when opening for a new field
-                    requestAnimationFrame(() => {
-                      if (canvasRef.current) {
-                        const ctx = canvasRef.current.getContext('2d');
-                        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-                      }
-                    });
-                  }
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#1D1D1F',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: 260,
                 }}
               >
-                {field.type === 'signature' ? (
-                  isFilled && fieldValue?.value ? (
-                    <img src={fieldValue.value} alt="Signature" className="w-full h-full object-contain" />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-blue-500 text-xs gap-1">
-                      <PenTool className="h-3 w-3" />
-                      Click to sign
-                    </div>
-                  )
-                ) : field.type === 'checkbox' ? (
-                  <label className="flex items-center justify-center w-full h-full cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldValue?.value === 'true'}
-                      onChange={(e) => updateFieldValue(field.id, e.target.checked ? 'true' : '')}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                  </label>
-                ) : (
-                  <input
-                    type={field.type === 'date' ? 'date' : 'text'}
-                    value={fieldValue?.value || ''}
-                    onChange={(e) => updateFieldValue(field.id, e.target.value)}
-                    placeholder={field.placeholder || (field.type === 'date' ? '' : 'Type here...')}
-                    className="w-full h-full px-1 text-sm bg-transparent border-none outline-none"
-                  />
-                )}
+                {signingDoc.subject}
               </div>
-            );
-          })}
+              <div style={{ fontSize: 12, color: '#6E6E73' }}>
+                Signing as {signingDoc.recipientName}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: progress counter */}
+          <div
+            style={{
+              fontSize: 13,
+              color: '#6E6E73',
+              flexShrink: 0,
+              background: '#F5F5F7',
+              border: '1px solid #E8E8ED',
+              borderRadius: 6,
+              padding: '4px 12px',
+            }}
+          >
+            <span style={{ fontWeight: 600, color: '#1D1D1F' }}>{filledCount}</span>
+            <span>/{totalRequired} fields</span>
+          </div>
         </div>
       </div>
 
-      {/* Signature pad modal */}
-      <ModalOverlay isOpen={!!showSignPad} onClose={() => setShowSignPad(null)}>
-        <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-4 sm:p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Draw Your Signature</h3>
+      {/* ── Scrollable body ──────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 96 }}>
 
-          <div className="border-2 border-gray-200 rounded-lg mb-4 touch-none">
+        {/* Error banner */}
+        {error && (
+          <div style={{ maxWidth: 900, margin: '16px auto 0', padding: '0 16px' }}>
+            <div
+              style={{
+                background: '#FFF2ED',
+                color: '#B64400',
+                fontSize: 14,
+                padding: '12px 16px',
+                borderRadius: 8,
+                border: '1px solid #FFDDC8',
+              }}
+            >
+              {error}
+            </div>
+          </div>
+        )}
+
+        {/* Optional sender message */}
+        {signingDoc.message && (
+          <div style={{ maxWidth: 900, margin: '16px auto 0', padding: '0 16px' }}>
+            <div
+              style={{
+                background: '#EBF3FE',
+                color: '#0071E3',
+                fontSize: 14,
+                padding: '12px 16px',
+                borderRadius: 8,
+                border: '1px solid #C0DAFD',
+              }}
+            >
+              {signingDoc.message}
+            </div>
+          </div>
+        )}
+
+        {/* Page navigation */}
+        <div
+          style={{
+            maxWidth: 900,
+            margin: '16px auto 0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+            aria-label="Previous page"
+            style={{
+              minWidth: 44,
+              minHeight: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'none',
+              border: 'none',
+              borderRadius: 8,
+              cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+              color: currentPage <= 1 ? '#C7C7CC' : '#1D1D1F',
+              transition: 'background 0.15s',
+            }}
+          >
+            <ChevronLeft style={{ width: 20, height: 20 }} />
+          </button>
+
+          <span
+            style={{
+              fontSize: 14,
+              color: '#6E6E73',
+              background: '#FFFFFF',
+              border: '1px solid #E8E8ED',
+              borderRadius: 8,
+              padding: '6px 16px',
+              fontWeight: 500,
+            }}
+          >
+            Page {currentPage} of {signingDoc.pageCount}
+          </span>
+
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(signingDoc.pageCount, p + 1))}
+            disabled={currentPage >= signingDoc.pageCount}
+            aria-label="Next page"
+            style={{
+              minWidth: 44,
+              minHeight: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'none',
+              border: 'none',
+              borderRadius: 8,
+              cursor: currentPage >= signingDoc.pageCount ? 'not-allowed' : 'pointer',
+              color: currentPage >= signingDoc.pageCount ? '#C7C7CC' : '#1D1D1F',
+              transition: 'background 0.15s',
+            }}
+          >
+            <ChevronRight style={{ width: 20, height: 20 }} />
+          </button>
+        </div>
+
+        {/* PDF + field overlays */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            padding: '16px 16px 0',
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              background: '#FFFFFF',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+              borderRadius: 4,
+            }}
+          >
+            <PdfDocument
+              file={`/api/sign/${link}/pdf`}
+              loading={
+                <div
+                  className="animate-pulse"
+                  style={{
+                    width: pdfWidth,
+                    height: pdfWidth * (792 / 612),
+                    background: '#E8E8ED',
+                    borderRadius: 4,
+                  }}
+                />
+              }
+            >
+              <Page
+                pageNumber={currentPage}
+                width={pdfWidth}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+              />
+            </PdfDocument>
+
+            {/* Field overlays — scaled to match responsive PDF width */}
+            {pageFields.map((field) => {
+              const fieldValue = fieldValues.find((fv) => fv.id === field.id);
+              const isFilled = !!fieldValue?.value;
+              const scale = pdfWidth / 612;
+
+              const isSignatureField = field.type === 'signature';
+              const isCheckbox = field.type === 'checkbox';
+
+              return (
+                <div
+                  key={field.id}
+                  style={{
+                    position: 'absolute',
+                    left: field.x * scale,
+                    top: field.y * scale,
+                    width: field.width * scale,
+                    height: field.height * scale,
+                    cursor: isSignatureField ? 'pointer' : 'default',
+                    background: isFilled
+                      ? 'rgba(52,199,89,0.08)'
+                      : isSignatureField
+                        ? 'rgba(0,113,227,0.08)'
+                        : '#F5F5F7',
+                    border: isFilled
+                      ? '2px solid #34C759'
+                      : isSignatureField
+                        ? '2px dashed #0071E3'
+                        : '1px solid #E8E8ED',
+                    borderRadius: 4,
+                    transition: 'background 0.15s, border-color 0.15s',
+                    overflow: 'hidden',
+                  }}
+                  onClick={() => {
+                    if (field.type === 'signature') {
+                      setShowSignPad(field.id);
+                      requestAnimationFrame(() => {
+                        if (canvasRef.current) {
+                          const ctx = canvasRef.current.getContext('2d');
+                          if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                        }
+                      });
+                    }
+                  }}
+                >
+                  {/* Required indicator */}
+                  {field.required && !isFilled && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 2,
+                        right: 4,
+                        fontSize: 10,
+                        color: '#B64400',
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        zIndex: 1,
+                      }}
+                    >
+                      *
+                    </span>
+                  )}
+
+                  {isSignatureField ? (
+                    isFilled && fieldValue?.value ? (
+                      <img src={fieldValue.value} alt="Signature" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    ) : (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          height: '100%',
+                          gap: 4,
+                          color: '#0071E3',
+                          fontSize: 12,
+                          fontWeight: 500,
+                          userSelect: 'none',
+                        }}
+                      >
+                        <PenTool style={{ width: 12, height: 12 }} />
+                        Click to sign
+                      </div>
+                    )
+                  ) : isCheckbox ? (
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '100%',
+                        height: '100%',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={fieldValue?.value === 'true'}
+                        onChange={(e) => updateFieldValue(field.id, e.target.checked ? 'true' : '')}
+                        style={{ width: 16, height: 16, accentColor: '#0071E3', cursor: 'pointer' }}
+                      />
+                    </label>
+                  ) : (
+                    <input
+                      type={field.type === 'date' ? 'date' : 'text'}
+                      value={fieldValue?.value || ''}
+                      onChange={(e) => updateFieldValue(field.id, e.target.value)}
+                      placeholder={field.placeholder || (field.type === 'date' ? '' : 'Type here...')}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        padding: '0 6px',
+                        fontSize: 13,
+                        background: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        color: '#1D1D1F',
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Sticky bottom action bar ─────────────────────────────────────────── */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: '#FFFFFF',
+          borderTop: '1px solid #E8E8ED',
+          padding: '12px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          zIndex: 40,
+        }}
+      >
+        {/* Progress indicator */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, maxWidth: 200 }}>
+          <div style={{ fontSize: 12, color: '#6E6E73', fontWeight: 500 }}>
+            {filledCount} of {totalRequired} required fields
+          </div>
+          <div
+            style={{
+              height: 4,
+              background: '#E8E8ED',
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: totalRequired > 0 ? `${(filledCount / totalRequired) * 100}%` : '0%',
+                background: filledCount === totalRequired ? '#34C759' : '#0071E3',
+                borderRadius: 2,
+                transition: 'width 0.3s ease-out',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Submit button */}
+        <MotionButton
+          onClick={handleSubmit}
+          disabled={submitting}
+          style={{
+            background: '#0071E3',
+            color: '#FFFFFF',
+            border: 'none',
+            borderRadius: 8,
+            height: 44,
+            padding: '0 24px',
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: submitting ? 'not-allowed' : 'pointer',
+            opacity: submitting ? 0.7 : 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            transition: 'background 0.15s ease-in-out',
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+            if (!submitting) (e.currentTarget as HTMLButtonElement).style.background = '#0066CC';
+          }}
+          onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+            (e.currentTarget as HTMLButtonElement).style.background = '#0071E3';
+          }}
+        >
+          <Check style={{ width: 16, height: 16 }} />
+          {submitting ? 'Submitting...' : 'Submit Signature'}
+        </MotionButton>
+      </div>
+
+      {/* ── Signature pad modal ──────────────────────────────────────────────── */}
+      <ModalOverlay isOpen={!!showSignPad} onClose={() => setShowSignPad(null)}>
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRadius: 18,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            maxWidth: 520,
+            width: '100%',
+            padding: '28px 24px 24px',
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: '#1D1D1F',
+              marginBottom: 20,
+            }}
+          >
+            Draw Your Signature
+          </h3>
+
+          {/* Canvas */}
+          <div
+            style={{
+              background: '#F5F5F7',
+              border: '1px solid #E8E8ED',
+              borderRadius: 8,
+              marginBottom: 20,
+              overflow: 'hidden',
+              touchAction: 'none',
+            }}
+          >
             <canvas
               ref={canvasRef}
               width={Math.min(460, viewportWidth - 64) * (typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1)}
               height={Math.max(140, Math.round(Math.min(460, viewportWidth - 64) * (160 / 460))) * (typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1)}
-              style={{ width: Math.min(460, viewportWidth - 64), height: Math.max(140, Math.round(Math.min(460, viewportWidth - 64) * (160 / 460))) }}
-              className="w-full cursor-crosshair"
+              style={{
+                width: Math.min(460, viewportWidth - 64),
+                height: Math.max(140, Math.round(Math.min(460, viewportWidth - 64) * (160 / 460))),
+                cursor: 'crosshair',
+                display: 'block',
+              }}
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
@@ -359,28 +776,79 @@ export default function SigningView() {
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {/* Modal action buttons */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            {/* Clear — left-aligned */}
             <MotionButton
               onClick={clearCanvas}
-              className="px-4 py-2.5 min-h-[44px] border border-gray-200 rounded-md text-sm text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors duration-150"
+              style={{
+                background: '#F5F5F7',
+                color: '#1D1D1F',
+                border: '1px solid #E8E8ED',
+                borderRadius: 8,
+                height: 44,
+                padding: '0 16px',
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'background 0.15s',
+              }}
             >
               Clear
             </MotionButton>
-            <div className="flex-1 hidden sm:block" />
-            <div className="flex gap-2">
-              <MotionButton
-                onClick={() => setShowSignPad(null)}
-                className="flex-1 sm:flex-none px-4 py-2.5 min-h-[44px] border border-gray-200 rounded-md text-sm text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors duration-150"
-              >
-                Cancel
-              </MotionButton>
-              <MotionButton
-                onClick={() => showSignPad && applySignature(showSignPad)}
-                className="flex-1 sm:flex-none px-4 py-2.5 min-h-[44px] bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors duration-150"
-              >
-                Apply
-              </MotionButton>
-            </div>
+
+            <div style={{ flex: 1 }} />
+
+            {/* Cancel */}
+            <MotionButton
+              onClick={() => setShowSignPad(null)}
+              style={{
+                background: '#F5F5F7',
+                color: '#1D1D1F',
+                border: '1px solid #E8E8ED',
+                borderRadius: 8,
+                height: 44,
+                padding: '0 16px',
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'background 0.15s',
+              }}
+            >
+              Cancel
+            </MotionButton>
+
+            {/* Apply — primary */}
+            <MotionButton
+              onClick={() => showSignPad && applySignature(showSignPad)}
+              style={{
+                background: '#0071E3',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: 8,
+                height: 44,
+                padding: '0 20px',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                (e.currentTarget as HTMLButtonElement).style.background = '#0066CC';
+              }}
+              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                (e.currentTarget as HTMLButtonElement).style.background = '#0071E3';
+              }}
+            >
+              Apply Signature
+            </MotionButton>
           </div>
         </div>
       </ModalOverlay>

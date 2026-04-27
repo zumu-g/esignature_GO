@@ -45,92 +45,289 @@ export default function Credits() {
     }
   };
 
-  return (
-    <PageEntrance className="max-w-4xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Credits</h1>
+  // Determine the "popular" pack — middle pack or highest credit count
+  const popularPackId = packs.length >= 2 ? packs[Math.floor(packs.length / 2)]?.id : undefined;
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-1">
-              <CreditCard className="h-5 w-5 text-blue-600" />
-              <span className="text-sm text-gray-500">Current Balance</span>
-            </div>
-            <div className="text-4xl font-bold text-gray-900">{user?.credits ?? 0} credits</div>
-            <p className="text-sm text-gray-500 mt-1">1 credit = 1 document send (unlimited pages & recipients)</p>
-          </div>
-          <CreditCoinIllustration size={80} className="flex-shrink-0" />
-        </div>
+  return (
+    <PageEntrance className="max-w-5xl mx-auto py-12 px-4">
+
+      {/* Page header */}
+      <div className="mb-10">
+        <h1 style={{ fontSize: 32, fontWeight: 600, color: '#1D1D1F', lineHeight: 1.1, marginBottom: 8 }}>
+          Buy Credits
+        </h1>
+        <p style={{ fontSize: 17, color: '#6E6E73' }}>
+          Each credit sends one document — unlimited pages and recipients.
+        </p>
       </div>
 
+      {/* Credit balance banner */}
+      <div
+        style={{
+          background: '#FFFFFF',
+          border: '1px solid #E8E8ED',
+          borderRadius: 18,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+          padding: '28px 32px',
+          marginBottom: 40,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 24,
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <CreditCard style={{ width: 18, height: 18, color: '#0071E3' }} />
+            <span style={{ fontSize: 14, color: '#6E6E73', fontWeight: 500 }}>Current Balance</span>
+          </div>
+          <div style={{ fontSize: 48, fontWeight: 700, color: '#1D1D1F', lineHeight: 1, marginBottom: 6 }}>
+            {user?.credits ?? 0}
+            <span style={{ fontSize: 20, fontWeight: 500, color: '#6E6E73', marginLeft: 10 }}>credits</span>
+          </div>
+          <p style={{ fontSize: 13, color: '#6E6E73', marginTop: 4 }}>
+            1 credit = 1 document send (unlimited pages &amp; recipients)
+          </p>
+        </div>
+        <CreditCoinIllustration size={80} className="flex-shrink-0" />
+      </div>
+
+      {/* Error */}
       {error && (
-        <div className="bg-red-50 text-red-600 text-sm p-3 rounded-md mb-4">{error}</div>
+        <div
+          style={{
+            background: '#FFF2ED',
+            color: '#B64400',
+            fontSize: 14,
+            padding: '12px 16px',
+            borderRadius: 8,
+            border: '1px solid #FFDDC8',
+            marginBottom: 24,
+          }}
+        >
+          {error}
+        </div>
       )}
 
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Buy Credits</h2>
+      {/* Section heading */}
+      <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1D1D1F', marginBottom: 20 }}>
+        Credit Packs
+      </h2>
+
+      {/* Packs grid */}
       {loadingData ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Loading credit packs...</p>
+        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+          <div
+            className="animate-spin"
+            style={{
+              width: 28,
+              height: 28,
+              border: '3px solid #E8E8ED',
+              borderTopColor: '#0071E3',
+              borderRadius: '50%',
+              margin: '0 auto 12px',
+            }}
+          />
+          <p style={{ fontSize: 14, color: '#6E6E73' }}>Loading credit packs...</p>
         </div>
       ) : (
-      <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        {packs.map((pack) => {
-          const pricePerCredit = (pack.price / 100 / pack.credits).toFixed(2);
-          return (
-            <StaggerItem key={pack.id}>
-              <MotionCard className="bg-white rounded-lg border border-gray-200 p-5 hover:border-blue-300 transition-all duration-200">
-                <div className="text-lg font-bold text-gray-900">{pack.credits} Credits</div>
-                <div className="text-2xl font-bold text-blue-600 my-2">${(pack.price / 100).toFixed(2)}</div>
-                <div className="text-xs text-gray-500 mb-4">${pricePerCredit} per credit</div>
-                <MotionButton
-                  onClick={() => handlePurchase(pack.id)}
-                  disabled={!!loading}
-                  className="w-full bg-blue-600 text-white py-2.5 rounded-md text-sm font-medium hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 transition-colors duration-150"
+        <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
+          {packs.map((pack) => {
+            const pricePerCredit = (pack.price / 100 / pack.credits).toFixed(2);
+            const isPopular = pack.id === popularPackId;
+
+            return (
+              <StaggerItem key={pack.id}>
+                <MotionCard
+                  style={{
+                    background: '#FFFFFF',
+                    border: isPopular ? '1px solid #0071E3' : '1px solid #E8E8ED',
+                    borderRadius: 18,
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                    overflow: 'hidden',
+                    transition: 'box-shadow 0.2s ease-out, transform 0.2s ease-out',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                  className="hover-card"
                 >
-                  {loading === pack.id ? 'Processing...' : 'Purchase'}
-                </MotionButton>
-              </MotionCard>
-            </StaggerItem>
-          );
-        })}
-      </StaggerList>
+                  {/* Popular badge band */}
+                  {isPopular && (
+                    <div
+                      style={{
+                        background: '#0071E3',
+                        padding: '8px 20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#FFFFFF', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                        Most Popular
+                      </span>
+                      <span
+                        style={{
+                          background: '#FF791B',
+                          color: '#FFFFFF',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          letterSpacing: '0.03em',
+                        }}
+                      >
+                        BEST VALUE
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={{ padding: '24px 24px 28px' }}>
+                    {/* Pack name */}
+                    <div style={{ fontSize: 15, fontWeight: 600, color: '#6E6E73', marginBottom: 4 }}>
+                      {pack.credits >= 50 ? 'Pro Pack' : pack.credits >= 20 ? 'Starter Pack' : 'Micro Pack'}
+                    </div>
+
+                    {/* Credit count — large, blue */}
+                    <div style={{ fontSize: 42, fontWeight: 700, color: '#0071E3', lineHeight: 1, marginBottom: 4 }}>
+                      {pack.credits}
+                      <span style={{ fontSize: 18, fontWeight: 500, color: '#6E6E73', marginLeft: 6 }}>credits</span>
+                    </div>
+
+                    {/* Price */}
+                    <div style={{ fontSize: 22, fontWeight: 600, color: '#1D1D1F', marginBottom: 4 }}>
+                      ${(pack.price / 100).toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#6E6E73', marginBottom: 20 }}>
+                      ${pricePerCredit} per credit
+                    </div>
+
+                    {/* Feature list */}
+                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[
+                        `${pack.credits} document sends`,
+                        'Unlimited pages per doc',
+                        'Unlimited signers',
+                        'Audit trail included',
+                      ].map((feature) => (
+                        <li key={feature} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#1D1D1F' }}>
+                          <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#0071E3', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                              <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </span>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* CTA button */}
+                    <MotionButton
+                      onClick={() => handlePurchase(pack.id)}
+                      disabled={!!loading}
+                      style={{
+                        width: '100%',
+                        background: isPopular ? '#0071E3' : '#F5F5F7',
+                        color: isPopular ? '#FFFFFF' : '#1D1D1F',
+                        border: isPopular ? 'none' : '1px solid #E8E8ED',
+                        borderRadius: 8,
+                        height: 44,
+                        fontSize: 15,
+                        fontWeight: 600,
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        opacity: loading && loading !== pack.id ? 0.5 : 1,
+                        transition: 'background 0.15s ease-in-out',
+                      }}
+                      onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                        if (!loading) {
+                          (e.currentTarget as HTMLButtonElement).style.background = isPopular ? '#0066CC' : '#EBEBED';
+                        }
+                      }}
+                      onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = isPopular ? '#0071E3' : '#F5F5F7';
+                      }}
+                    >
+                      {loading === pack.id ? 'Processing...' : 'Purchase'}
+                    </MotionButton>
+                  </div>
+                </MotionCard>
+              </StaggerItem>
+            );
+          })}
+        </StaggerList>
       )}
 
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Transaction History</h2>
+      {/* Transaction History */}
+      <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1D1D1F', marginBottom: 16 }}>
+        Transaction History
+      </h2>
+
       {history.length === 0 ? (
-        <p className="text-sm text-gray-500">No transactions yet</p>
+        <p style={{ fontSize: 14, color: '#6E6E73' }}>No transactions yet.</p>
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Type</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Description</th>
-                  <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Credits</th>
-                  <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Date</th>
+          <div
+            className="hidden md:block"
+            style={{
+              background: '#FFFFFF',
+              border: '1px solid #E8E8ED',
+              borderRadius: 18,
+              boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+              overflow: 'hidden',
+            }}
+          >
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#F5F5F7', borderBottom: '1px solid #E8E8ED' }}>
+                  {['Type', 'Description', 'Credits', 'Date'].map((col, i) => (
+                    <th
+                      key={col}
+                      style={{
+                        textAlign: i >= 2 ? 'right' : 'left',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: '#6E6E73',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                        padding: '12px 20px',
+                      }}
+                    >
+                      {col}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody>
                 {history.map((tx, index) => (
-                  <motion.tr key={tx.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.05 }}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
+                  <motion.tr
+                    key={tx.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    style={{ borderBottom: '1px solid #E8E8ED' }}
+                  >
+                    <td style={{ padding: '14px 20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {tx.amount > 0 ? (
-                          <ArrowUpRight className="h-4 w-4 text-green-500" />
+                          <ArrowUpRight style={{ width: 16, height: 16, color: '#34C759' }} />
                         ) : (
-                          <ArrowDownRight className="h-4 w-4 text-red-500" />
+                          <ArrowDownRight style={{ width: 16, height: 16, color: '#B64400' }} />
                         )}
-                        <span className="text-sm capitalize">{tx.transactionType}</span>
+                        <span style={{ fontSize: 14, color: '#1D1D1F', textTransform: 'capitalize' }}>{tx.transactionType}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{tx.description || '-'}</td>
-                    <td className={`px-4 py-3 text-sm text-right font-medium ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <td style={{ padding: '14px 20px', fontSize: 14, color: '#6E6E73' }}>{tx.description || '—'}</td>
+                    <td
+                      style={{
+                        padding: '14px 20px',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        textAlign: 'right',
+                        color: tx.amount > 0 ? '#34C759' : '#B64400',
+                      }}
+                    >
                       {tx.amount > 0 ? '+' : ''}{tx.amount}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500 text-right">
+                    <td style={{ padding: '14px 20px', fontSize: 14, color: '#6E6E73', textAlign: 'right' }}>
                       {new Date(tx.createdAt).toLocaleDateString()}
                     </td>
                   </motion.tr>
@@ -140,25 +337,36 @@ export default function Credits() {
           </div>
 
           {/* Mobile cards */}
-          <div className="md:hidden space-y-2">
+          <div className="md:hidden" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {history.map((tx, index) => (
-              <motion.div key={tx.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.05 }} className="bg-white rounded-lg border border-gray-200 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+              <motion.div
+                key={tx.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E8E8ED',
+                  borderRadius: 12,
+                  padding: '14px 16px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {tx.amount > 0 ? (
-                      <ArrowUpRight className="h-4 w-4 text-green-500" />
+                      <ArrowUpRight style={{ width: 16, height: 16, color: '#34C759' }} />
                     ) : (
-                      <ArrowDownRight className="h-4 w-4 text-red-500" />
+                      <ArrowDownRight style={{ width: 16, height: 16, color: '#B64400' }} />
                     )}
-                    <span className="text-sm font-medium capitalize">{tx.transactionType}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#1D1D1F', textTransform: 'capitalize' }}>{tx.transactionType}</span>
                   </div>
-                  <span className={`text-sm font-bold ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: tx.amount > 0 ? '#34C759' : '#B64400' }}>
                     {tx.amount > 0 ? '+' : ''}{tx.amount}
                   </span>
                 </div>
-                <div className="flex items-center justify-between mt-1 text-xs text-gray-500">
-                  <span>{tx.description || '-'}</span>
-                  <span>{new Date(tx.createdAt).toLocaleDateString()}</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                  <span style={{ fontSize: 12, color: '#6E6E73' }}>{tx.description || '—'}</span>
+                  <span style={{ fontSize: 12, color: '#6E6E73' }}>{new Date(tx.createdAt).toLocaleDateString()}</span>
                 </div>
               </motion.div>
             ))}
