@@ -150,6 +150,33 @@ export default function DocumentPrepare() {
     if (selectedField === fieldId) setSelectedField(null);
   };
 
+  // Arrow key nudging for selected fields
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedField) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      const DIRS: Record<string, [number, number]> = {
+        ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+        ArrowUp: [0, -1], ArrowDown: [0, 1],
+      };
+      const dir = DIRS[e.key];
+      if (!dir) return;
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+      setFields((prev) =>
+        prev.map((f) =>
+          f.id === selectedField
+            ? { ...f, x: Math.max(0, f.x + dir[0] * step), y: Math.max(0, f.y + dir[1] * step) }
+            : f
+        )
+      );
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedField]);
+
   const handleSmartFill = async () => {
     if (!id) return;
     setDetectingFields(true);
@@ -1092,8 +1119,8 @@ export default function DocumentPrepare() {
                     dragConstraints={pageRef}
                     dragElastic={0}
                     initial={false}
-                    transition={{ duration: 0.2 }}
-                    whileDrag={{ scale: 1.04, boxShadow: '0 8px 25px rgba(0,0,0,0.18)', zIndex: 50 }}
+                    transition={{ type: 'tween', duration: 0 }}
+                    whileDrag={{ scale: 1.02, boxShadow: '0 4px 16px rgba(0,0,0,0.18)', zIndex: 50 }}
                     onDragStart={() => setDraggingPlacedField(field.id)}
                     onDragEnd={(_e, info) => {
                       setFields((prev) =>
@@ -1251,6 +1278,9 @@ export default function DocumentPrepare() {
                         >
                           <Trash2 style={{ width: '12px', height: '12px' }} />
                         </button>
+                        <span style={{ fontSize: '10px', color: '#8A8A8E', whiteSpace: 'nowrap', paddingLeft: '2px' }}>
+                          ↑↓←→ nudge
+                        </span>
                       </div>
                     )}
                   </motion.div>
