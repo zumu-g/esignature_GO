@@ -67,6 +67,19 @@ router.get('/:link', async (req: Request, res: Response, next: NextFunction) => 
       (f) => f.recipientId === recipient.id
     );
 
+    const safeFields = myFields.map((f) => ({
+      id: f.id,
+      type: f.type,
+      page: f.page,
+      x: f.x,
+      y: f.y,
+      width: f.width,
+      height: f.height,
+      required: f.required,
+      placeholder: f.placeholder,
+      value: f.value,
+    }));
+
     res.json({
       recipientId: recipient.id,
       recipientName: recipient.name,
@@ -74,7 +87,7 @@ router.get('/:link', async (req: Request, res: Response, next: NextFunction) => 
       subject: recipient.envelope.subject,
       message: recipient.envelope.message,
       pageCount: recipient.envelope.document.pageCount,
-      fields: myFields,
+      fields: safeFields,
       allRecipients: allRecipients.map((r) => ({
         name: r.name,
         status: r.status,
@@ -96,7 +109,16 @@ router.get('/:link/pdf', async (req: Request, res: Response, next: NextFunction)
 
     const recipient = await prisma.recipient.findUnique({
       where: { uniqueLink: link },
-      include: { envelope: { include: { document: true } } },
+      include: {
+        envelope: {
+          include: {
+            document: true,
+            recipients: {
+              select: { id: true, signingOrder: true, status: true },
+            },
+          },
+        },
+      },
     });
 
     if (!recipient) {
@@ -105,6 +127,14 @@ router.get('/:link/pdf', async (req: Request, res: Response, next: NextFunction)
 
     if (recipient.envelope.status === 'voided') {
       throw new AppError('This document has been voided', 400);
+    }
+
+    // Enforce signing order — prevent viewing PDF before earlier signers have completed
+    const earlierPending = recipient.envelope.recipients.some(
+      (r) => r.signingOrder < recipient.signingOrder && r.status === 'pending'
+    );
+    if (earlierPending) {
+      throw new AppError('You are not yet permitted to view this document. Waiting for previous signers to complete.', 403);
     }
 
     const absolutePath = path.resolve(recipient.envelope.document.filePath);
@@ -255,6 +285,7 @@ router.post('/:link/complete', async (req: Request, res: Response, next: NextFun
 
     // Generate final PDF outside transaction to avoid file I/O in DB lock
     if (allComplete) {
+      // Re-fetch fields to get latest values (including just-submitted ones from the transaction)
       const allFields = await prisma.field.findMany({
         where: { envelopeId: recipient.envelope.id },
       });
@@ -262,7 +293,7 @@ router.post('/:link/complete', async (req: Request, res: Response, next: NextFun
         id: f.id, type: f.type, page: f.page,
         x: f.x, y: f.y, width: f.width, height: f.height, value: f.value,
       }));
-      await saveFinalPdf(recipient.envelope.document.filePath, fieldsForPdf, uploadDir);
+      await saveFinalPdf(recipient.envelope.document.filePath, fieldsForPdf, uploadDir, recipient.envelope.id);
 
       // Notify document owner that all signing is complete
       const owner = await prisma.user.findUnique({ where: { id: recipient.envelope.userId } });

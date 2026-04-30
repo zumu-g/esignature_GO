@@ -258,6 +258,21 @@ export default function SigningView() {
             <div style={{ marginTop: 28 }}>
               <WaitingIllustration size={90} className="mx-auto" />
               <p style={{ fontSize: 13, color: '#6E6E73', marginTop: 12 }}>Waiting for remaining signers…</p>
+              {signingDoc?.allRecipients && signingDoc.allRecipients.length > 1 && (
+                <div style={{ marginTop: '16px', textAlign: 'left' }}>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: '#1D1D1F', marginBottom: '8px' }}>Signing progress</p>
+                  {signingDoc.allRecipients.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', fontSize: '13px' }}>
+                      <span style={{ color: r.status === 'signed' ? '#34C759' : '#8A8A8E' }}>
+                        {r.status === 'signed' ? '✓' : '○'}
+                      </span>
+                      <span style={{ color: '#1D1D1F' }}>{r.name}</span>
+                      {r.status === 'signed' && <span style={{ color: '#6E6E73', fontSize: '11px' }}>Signed</span>}
+                      {r.status === 'pending' && <span style={{ color: '#6E6E73', fontSize: '11px' }}>Pending</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </SuccessEntrance>
@@ -277,16 +292,20 @@ export default function SigningView() {
           background: '#F5F5F7',
         }}
       >
-        <div
-          className="animate-spin"
-          style={{
-            width: 36,
-            height: 36,
-            border: '3px solid #E8E8ED',
-            borderTopColor: '#0071E3',
-            borderRadius: '50%',
-          }}
-        />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '18px', fontWeight: 600, color: '#1D1D1F', marginBottom: '16px' }}>eSignatureGO</div>
+          <div
+            className="animate-spin"
+            style={{
+              width: 36,
+              height: 36,
+              border: '3px solid #E8E8ED',
+              borderTopColor: '#0071E3',
+              borderRadius: '50%',
+              margin: '0 auto',
+            }}
+          />
+        </div>
       </div>
     );
   }
@@ -382,6 +401,7 @@ export default function SigningView() {
         {error && (
           <div style={{ maxWidth: 900, margin: '16px auto 0', padding: '0 16px' }}>
             <div
+              role="alert"
               style={{
                 background: '#FFF2ED',
                 color: '#B64400',
@@ -529,9 +549,24 @@ export default function SigningView() {
               const isSignatureField = field.type === 'signature';
               const isCheckbox = field.type === 'checkbox';
 
+              const openSignPad = () => {
+                if (field.type === 'signature') {
+                  setShowSignPad(field.id);
+                  requestAnimationFrame(() => {
+                    if (canvasRef.current) {
+                      const ctx = canvasRef.current.getContext('2d');
+                      if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                    }
+                  });
+                }
+              };
+
               return (
                 <div
                   key={field.id}
+                  role={isSignatureField ? 'button' : undefined}
+                  tabIndex={isSignatureField ? 0 : undefined}
+                  aria-label={isSignatureField ? 'Click to sign' : undefined}
                   style={{
                     position: 'absolute',
                     left: field.x * scale,
@@ -553,15 +588,11 @@ export default function SigningView() {
                     transition: 'background 0.15s, border-color 0.15s',
                     overflow: 'hidden',
                   }}
-                  onClick={() => {
-                    if (field.type === 'signature') {
-                      setShowSignPad(field.id);
-                      requestAnimationFrame(() => {
-                        if (canvasRef.current) {
-                          const ctx = canvasRef.current.getContext('2d');
-                          if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-                        }
-                      });
+                  onClick={openSignPad}
+                  onKeyDown={(e) => {
+                    if (isSignatureField && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      openSignPad();
                     }
                   }}
                 >
@@ -628,6 +659,7 @@ export default function SigningView() {
                       value={fieldValue?.value || ''}
                       onChange={(e) => updateFieldValue(field.id, e.target.value)}
                       placeholder={field.placeholder || (field.type === 'date' ? '' : 'Type here...')}
+                      aria-label={field.placeholder || field.type}
                       style={{
                         width: '100%',
                         height: '100%',

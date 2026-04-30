@@ -3,12 +3,16 @@
  * Respects prefers-reduced-motion automatically via Framer Motion.
  */
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
-import { type ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 
-// Check reduced motion preference
-const prefersReducedMotion = typeof window !== 'undefined'
-  ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  : false;
+// Check reduced motion preference — reactive to system preference changes
+const _motionMediaQuery = typeof window !== 'undefined'
+  ? window.matchMedia('(prefers-reduced-motion: reduce)')
+  : null;
+let prefersReducedMotion = _motionMediaQuery?.matches ?? false;
+if (_motionMediaQuery) {
+  _motionMediaQuery.addEventListener('change', (e) => { prefersReducedMotion = e.matches; });
+}
 
 // Shared transition defaults
 const springTransition = { type: 'spring', stiffness: 300, damping: 30 };
@@ -63,19 +67,18 @@ export function StaggerItem({ children, className }: { children: ReactNode; clas
 }
 
 // Interactive button wrapper
+type MotionButtonProps = React.ComponentPropsWithoutRef<'button'> & {
+  children: ReactNode;
+};
+
 export function MotionButton({
   children,
   className,
   onClick,
   disabled,
   type = 'button',
-}: {
-  children: ReactNode;
-  className?: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  type?: 'button' | 'submit' | 'reset';
-}) {
+  ...rest
+}: MotionButtonProps) {
   return (
     <motion.button
       whileHover={prefersReducedMotion ? {} : { scale: 1.02 }}
@@ -85,6 +88,7 @@ export function MotionButton({
       onClick={onClick}
       disabled={disabled}
       type={type}
+      {...rest}
     >
       {children}
     </motion.button>

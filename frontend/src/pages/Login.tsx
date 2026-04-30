@@ -202,6 +202,14 @@ export default function Login() {
                     e.target.style.boxShadow = 'none';
                   }}
                 />
+                <div style={{ textAlign: 'right', marginTop: '4px' }}>
+                  <span
+                    style={{ fontSize: '13px', color: '#0071E3', cursor: 'pointer' }}
+                    onClick={() => alert('Password reset coming soon. Contact support at support@esignaturego.com')}
+                  >
+                    Forgot password?
+                  </span>
+                </div>
               </div>
 
               {/* Submit */}

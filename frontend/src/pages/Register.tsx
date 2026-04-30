@@ -69,6 +69,7 @@ function AppleInput({
 
 export default function Register() {
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '' });
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuthStore();
@@ -77,6 +78,10 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (form.password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
     setLoading(true);
     try {
       await register(form.email, form.password, form.firstName, form.lastName);
@@ -235,6 +240,24 @@ export default function Register() {
                   required
                   placeholder="Minimum 8 characters"
                   minLength={8}
+                />
+              </div>
+
+              {/* Confirm password */}
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 500, color: '#1D1D1F', display: 'block', marginBottom: '6px' }}>
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  placeholder="Re-enter your password"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #E8E8ED', fontSize: '16px', outline: 'none', boxSizing: 'border-box' }}
+                  onFocus={(e) => { e.target.style.borderColor = '#0071E3'; e.target.style.boxShadow = '0 0 0 3px rgba(0,113,227,0.1)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#E8E8ED'; e.target.style.boxShadow = 'none'; }}
                 />
               </div>
 

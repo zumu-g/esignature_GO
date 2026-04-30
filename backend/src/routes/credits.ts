@@ -43,26 +43,8 @@ router.post('/purchase', async (req: AuthRequest, res: Response, next: NextFunct
       throw new AppError('Invalid credit pack', 400);
     }
 
-    // STUB: In production, Stripe payment must be verified before granting credits
-    if (process.env.NODE_ENV === 'production') {
-      throw new AppError('Payment processing not configured. Please contact support.', 501);
-    }
-
-    const user = await prisma.user.update({
-      where: { id: req.user!.userId },
-      data: { credits: { increment: pack.credits } },
-    });
-
-    await prisma.creditTransaction.create({
-      data: {
-        userId: req.user!.userId,
-        amount: pack.credits,
-        transactionType: 'purchase',
-        description: pack.label,
-      },
-    });
-
-    res.json({ credits: user.credits, purchased: pack.credits });
+    // TODO: implement Stripe checkout
+    throw new AppError('Payment processing not yet configured', 503);
   } catch (error) {
     next(error);
   }

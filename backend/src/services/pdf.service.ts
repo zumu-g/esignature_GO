@@ -75,10 +75,11 @@ export async function applyFieldsToPdf(
 export async function saveFinalPdf(
   pdfPath: string,
   fields: Field[],
-  outputDir: string
+  outputDir: string,
+  outputName?: string
 ): Promise<string> {
   const pdfBuffer = await applyFieldsToPdf(pdfPath, fields);
-  const baseName = path.basename(pdfPath, '.pdf');
+  const baseName = outputName ?? path.basename(pdfPath, '.pdf');
   const outputPath = path.join(outputDir, `${baseName}_signed.pdf`);
   await fs.writeFile(outputPath, pdfBuffer);
   return outputPath;

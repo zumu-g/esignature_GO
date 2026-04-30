@@ -15,6 +15,11 @@ import { errorHandler } from './middleware/error';
 
 dotenv.config();
 
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not set. Exiting.');
+  process.exit(1);
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -67,6 +72,9 @@ app.use('/api/documents', documentsRouter);
 app.use('/api/sign', signingLimiter, signingRouter);
 app.use('/api/signatures', signaturesRouter);
 app.use('/api/credits', creditsRouter);
+
+// JSON 404 catch-all
+app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Error handler
 app.use(errorHandler);

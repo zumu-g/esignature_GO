@@ -3,11 +3,20 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
+import rateLimit from 'express-rate-limit';
 import { getPageCount } from '../services/pdf.service';
 import { AppError } from '../middleware/error';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { sendSigningRequest } from '../services/email.service';
 import prisma from '../db';
+
+const detectFieldsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: { error: 'Too many detect-fields requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const router = Router();
 
@@ -55,7 +64,17 @@ router.post('/upload', async (req: AuthRequest, res: Response, next: NextFunctio
       throw new AppError('No file uploaded', 400);
     }
 
-    const filePath = req.file.path;
+    // Verify PDF magic bytes
+    const buf = Buffer.alloc(5);
+    const fd = await fs.open(req.file.path, 'r');
+    await fd.read(buf, 0, 5, 0);
+    await fd.close();
+    if (buf.toString('ascii') !== '%PDF-') {
+      await fs.unlink(req.file.path);
+      throw new AppError('Invalid PDF file', 400);
+    }
+
+    const filePath = path.resolve(req.file.path);
     const pageCount = await getPageCount(filePath);
 
     const document = await prisma.document.create({
@@ -87,7 +106,11 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       },
     });
 
-    res.json(documents);
+    const safeDocuments = documents.map((doc) => {
+      const { filePath: _fp, ...rest } = doc as any;
+      return rest;
+    });
+    res.json(safeDocuments);
   } catch (error) {
     next(error);
   }
@@ -109,7 +132,8 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
       throw new AppError('Document not found', 404);
     }
 
-    res.json(document);
+    const { filePath: _fp, ...safeDoc } = document as any;
+    res.json(safeDoc);
   } catch (error) {
     next(error);
   }
@@ -151,6 +175,12 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
       throw new AppError('Subject is required', 400);
     }
 
+    // Subject/message length and CRLF sanitisation
+    if (subject && subject.length > 255) throw new AppError('Subject must be 255 characters or fewer', 400);
+    if (message && message.length > 2000) throw new AppError('Message must be 2000 characters or fewer', 400);
+    const safeSubject = (subject || '').replace(/[\r\n]/g, ' ');
+    const safeMessage = (message || '').replace(/[\r\n]/g, ' ');
+
     if ((!recipients || recipients.length === 0) && !fields.some((f) => f.value)) {
       throw new AppError('At least one recipient or self-filled field is required', 400);
     }
@@ -167,6 +197,14 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
       }
     }
 
+    // Validate field coordinates
+    for (const f of fields) {
+      if (typeof f.x !== 'number' || f.x < 0 || typeof f.y !== 'number' || f.y < 0 ||
+          typeof f.width !== 'number' || f.width <= 0 || typeof f.height !== 'number' || f.height <= 0) {
+        throw new AppError('Invalid field coordinates', 400);
+      }
+    }
+
     // Validate recipient emails
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (recipients && recipients.length > 0) {
@@ -174,6 +212,19 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
         if (!emailRegex.test(r.email)) {
           throw new AppError(`Invalid email format: ${r.email}`, 400);
         }
+      }
+    }
+
+    // Duplicate recipient email check
+    const emails = (recipients || []).map((r: any) => r.email?.toLowerCase());
+    if (new Set(emails).size !== emails.length) {
+      throw new AppError('Duplicate recipient email addresses are not allowed', 400);
+    }
+
+    // Validate signingOrder values
+    for (const r of (recipients || [])) {
+      if (r.signingOrder !== undefined && (!Number.isInteger(Number(r.signingOrder)) || Number(r.signingOrder) < 1)) {
+        throw new AppError('signingOrder must be a positive integer', 400);
       }
     }
 
@@ -213,7 +264,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
           userId: req.user!.userId,
           amount: -1,
           transactionType: 'usage',
-          description: `Sent: ${subject}`,
+          description: `Sent: ${safeSubject}`,
         },
       });
 
@@ -222,8 +273,8 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
         data: {
           documentId: document.id,
           userId: req.user!.userId,
-          subject,
-          message,
+          subject: safeSubject,
+          message: safeMessage || null,
           status: 'sent',
         },
       });
@@ -294,7 +345,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
         x: f.x, y: f.y, width: f.width, height: f.height, value: f.value,
       }));
       const { saveFinalPdf } = await import('../services/pdf.service');
-      await saveFinalPdf(document.filePath, fieldsForPdf, uploadDir);
+      await saveFinalPdf(document.filePath, fieldsForPdf, uploadDir, result.envelope.id);
     }
 
     // Return envelope with signing links
@@ -321,8 +372,8 @@ router.post('/:id/send', async (req: AuthRequest, res: Response, next: NextFunct
         recipientEmail: signer.email,
         senderName: result.senderName || 'Someone',
         documentTitle: document.name,
-        subject,
-        message,
+        subject: safeSubject,
+        message: safeMessage || undefined,
         signingUrl: `${frontendUrl}/sign/${signer.uniqueLink}`,
       }).catch((err) => console.error('[email] Failed to send signing request:', err.message));
     }
@@ -341,24 +392,31 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
   try {
     const document = await prisma.document.findFirst({
       where: { id: req.params.id, userId: req.user!.userId },
+      include: { envelopes: true },
     });
 
     if (!document) {
       throw new AppError('Document not found', 404);
     }
 
-    // Delete original and signed PDF from disk
+    if (document.status === 'sent') {
+      throw new AppError('Cannot delete a document that has been sent for signing. Void it first.', 409);
+    }
+
+    // Delete original PDF from disk
     try {
       await fs.unlink(document.filePath);
     } catch {
       // File may not exist
     }
-    try {
-      const baseName = path.basename(document.filePath, '.pdf');
-      const signedPath = path.join(uploadDir, `${baseName}_signed.pdf`);
-      await fs.unlink(signedPath);
-    } catch {
-      // Signed file may not exist
+    // Delete signed PDFs for each envelope (named {envelopeId}_signed.pdf)
+    for (const envelope of document.envelopes) {
+      try {
+        const signedPath = path.join(path.resolve(uploadDir), `${envelope.id}_signed.pdf`);
+        await fs.unlink(signedPath);
+      } catch {
+        // Signed file may not exist
+      }
     }
 
     await prisma.document.delete({ where: { id: document.id } });
@@ -373,20 +431,25 @@ router.get('/:id/download', async (req: AuthRequest, res: Response, next: NextFu
   try {
     const document = await prisma.document.findFirst({
       where: { id: req.params.id, userId: req.user!.userId },
+      include: { envelopes: { orderBy: { createdAt: 'desc' }, take: 1 } },
     });
 
     if (!document) {
       throw new AppError('Document not found', 404);
     }
 
-    const baseName = path.basename(document.filePath, '.pdf');
-    const signedPath = path.join(uploadDir, `${baseName}_signed.pdf`);
-
     // Allow downloading original with ?original=true query param
     if (req.query.original === 'true') {
       res.download(document.filePath, document.name);
       return;
     }
+
+    // Signed PDFs are named {envelopeId}_signed.pdf
+    const envelope = document.envelopes[0];
+    if (!envelope) {
+      throw new AppError('Signed document not yet available. All recipients must complete signing first.', 404);
+    }
+    const signedPath = path.join(path.resolve(uploadDir), `${envelope.id}_signed.pdf`);
 
     try {
       await fs.access(signedPath);
@@ -400,7 +463,7 @@ router.get('/:id/download', async (req: AuthRequest, res: Response, next: NextFu
 });
 
 // Detect form fields from PDF text
-router.get('/:id/detect-fields', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:id/detect-fields', detectFieldsLimiter, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const document = await prisma.document.findFirst({
       where: { id: req.params.id, userId: req.user!.userId },
@@ -458,7 +521,6 @@ router.get('/:id/detect-fields', async (req: AuthRequest, res: Response, next: N
     res.json({
       fields: detectedFields,
       pageCount: document.pageCount,
-      textPreview: text.substring(0, 500),
     });
   } catch (error) {
     next(error);

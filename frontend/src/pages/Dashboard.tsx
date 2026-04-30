@@ -32,8 +32,11 @@ export default function Dashboard() {
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +102,11 @@ export default function Dashboard() {
   };
 
   const handleDelete = async (id: string) => {
+    const doc = documents.find((d) => d.id === id);
+    if (doc?.status === 'sent') {
+      setError('This document has active signing links. Void it first before deleting.');
+      return;
+    }
     if (!confirm('Delete this document?')) return;
     try {
       await api.deleteDocument(id);
@@ -107,6 +115,12 @@ export default function Dashboard() {
       setError(err instanceof Error ? err.message : 'Delete failed');
     }
   };
+
+  const filteredDocuments = documents.filter((d) => {
+    const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' || d.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
   const StatusBadge = ({ status }: { status: string }) => (
     <span
@@ -182,6 +196,7 @@ export default function Dashboard() {
           {/* ── Error banner ── */}
           {error && (
             <div
+              role="alert"
               style={{
                 background: 'rgba(182,68,0,0.08)',
                 border: '1px solid rgba(182,68,0,0.2)',
@@ -190,9 +205,17 @@ export default function Dashboard() {
                 padding: '10px 16px',
                 borderRadius: 10,
                 marginBottom: 20,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}
             >
-              {error}
+              <span>{error}</span>
+              <button
+                onClick={() => setError('')}
+                aria-label="Dismiss error"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: '8px', color: 'inherit', fontWeight: 600 }}
+              >×</button>
             </div>
           )}
 
@@ -314,10 +337,53 @@ export default function Dashboard() {
                 </span>
               </div>
 
-              {/* Section heading */}
-              <h2 style={{ fontSize: 21, fontWeight: 600, color: '#1D1D1F', marginBottom: 16 }}>
-                All Documents
-              </h2>
+              {/* Section heading + search/filter row */}
+              <div className="flex items-center justify-between" style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                <h2 style={{ fontSize: 21, fontWeight: 600, color: '#1D1D1F', margin: 0 }}>
+                  All Documents
+                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <input
+                    type="search"
+                    placeholder="Search documents…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{
+                      height: 36,
+                      padding: '0 12px',
+                      borderRadius: 8,
+                      border: '1px solid #E8E8ED',
+                      fontSize: 14,
+                      color: '#1D1D1F',
+                      backgroundColor: '#FFFFFF',
+                      outline: 'none',
+                      minWidth: 180,
+                    }}
+                    aria-label="Search documents"
+                  />
+                  {(['all', 'draft', 'sent', 'completed', 'voided'] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setStatusFilter(s)}
+                      style={{
+                        height: 36,
+                        padding: '0 14px',
+                        borderRadius: 20,
+                        border: statusFilter === s ? '1px solid #0071E3' : '1px solid #E8E8ED',
+                        backgroundColor: statusFilter === s ? 'rgba(0,113,227,0.08)' : '#FFFFFF',
+                        color: statusFilter === s ? '#0071E3' : '#6E6E73',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Card grid — 3 col desktop / 2 col tablet / 1 col mobile */}
               <div
@@ -327,7 +393,7 @@ export default function Dashboard() {
                   gap: 24,
                 }}
               >
-                {documents.map((doc, index) => {
+                {filteredDocuments.map((doc, index) => {
                   const envelope = doc.envelopes?.[0];
                   const recipients = envelope?.recipients || [];
                   const isHovered = hoveredCard === doc.id;
@@ -402,7 +468,7 @@ export default function Dashboard() {
                         </span>
                         <span style={{ fontSize: 12, color: '#E8E8ED' }}>·</span>
                         <span style={{ fontSize: 12, color: '#6E6E73' }}>
-                          {new Date(doc.createdAt).toLocaleDateString(undefined, {
+                          {new Date(doc.createdAt).toLocaleDateString('en-AU', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric',
@@ -423,7 +489,7 @@ export default function Dashboard() {
                           }}
                         >
                           {recipients.map((r) => (
-                            <div key={r.id} className="flex items-center gap-1.5">
+                            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                               <span style={{ fontSize: 13, color: '#1D1D1F' }}>{r.name}</span>
                               {r.status === 'signed' ? (
                                 <CheckCircle className="h-3.5 w-3.5" style={{ color: '#34C759' }} />
@@ -432,6 +498,8 @@ export default function Dashboard() {
                               ) : (
                                 <Clock className="h-3.5 w-3.5" style={{ color: '#6E6E73' }} />
                               )}
+                              {r.signedAt && <span style={{ fontSize: '10px', color: '#6E6E73' }}>Signed {new Date(r.signedAt).toLocaleDateString('en-AU')}</span>}
+                              {!r.signedAt && r.viewedAt && <span style={{ fontSize: '10px', color: '#6E6E73' }}>Viewed {new Date(r.viewedAt).toLocaleDateString('en-AU')}</span>}
                             </div>
                           ))}
                         </div>
@@ -465,10 +533,16 @@ export default function Dashboard() {
 
                         {doc.status === 'completed' && (
                           <ActionButton
-                            label="Download"
-                            icon={<Download className="h-4 w-4" />}
+                            label={downloading === doc.id ? 'Downloading…' : 'Download'}
+                            icon={downloading === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                             variant="secondary"
-                            onClick={() => api.downloadDocument(doc.id).catch((err) => setError(err.message))}
+                            disabled={downloading === doc.id}
+                            onClick={async () => {
+                              setDownloading(doc.id);
+                              try { await api.downloadDocument(doc.id); }
+                              catch (err) { setError(err instanceof Error ? err.message : 'Download failed'); }
+                              finally { setDownloading(null); }
+                            }}
                           />
                         )}
 
@@ -500,9 +574,10 @@ interface ActionButtonProps {
   icon: React.ReactNode;
   variant: 'primary' | 'secondary' | 'danger';
   onClick: () => void;
+  disabled?: boolean;
 }
 
-function ActionButton({ label, icon, variant, onClick }: ActionButtonProps) {
+function ActionButton({ label, icon, variant, onClick, disabled }: ActionButtonProps) {
   const [hovered, setHovered] = useState(false);
 
   const base: React.CSSProperties = {
@@ -539,8 +614,9 @@ function ActionButton({ label, icon, variant, onClick }: ActionButtonProps) {
 
   return (
     <button
-      style={{ ...base, ...variantStyles[variant] }}
+      style={{ ...base, ...variantStyles[variant], ...(disabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
       onClick={onClick}
+      disabled={disabled}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >

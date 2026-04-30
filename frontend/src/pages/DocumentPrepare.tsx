@@ -82,6 +82,7 @@ export default function DocumentPrepare() {
   }, []);
 
   const [loadingDoc, setLoadingDoc] = useState(true);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [showSmartFill, setShowSmartFill] = useState(false);
   const [detectingFields, setDetectingFields] = useState(false);
   const [detectedFields, setDetectedFields] = useState<(DetectedField & { answer: string })[]>([]);
@@ -97,6 +98,9 @@ export default function DocumentPrepare() {
       api.getDocument(id).then((d) => {
         setDoc(d);
         setSubject(`Please sign: ${d.name}`);
+        if (d.status !== 'draft') {
+          navigate('/');
+        }
       }).catch((err) => {
         setError(err instanceof Error ? err.message : 'Failed to load document');
       }).finally(() => {
@@ -318,7 +322,7 @@ export default function DocumentPrepare() {
   if (signingLinks) {
     return (
       <SuccessEntrance>
-        <div style={{ minHeight: '100vh', backgroundColor: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div role="alert" style={{ minHeight: '100vh', backgroundColor: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div style={{ maxWidth: '560px', width: '100%', backgroundColor: '#FFFFFF', borderRadius: '18px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', overflow: 'hidden' }}>
             {/* Success header */}
             <div style={{ padding: '32px 32px 24px', textAlign: 'center', borderBottom: '1px solid #E8E8ED' }}>
@@ -353,11 +357,15 @@ export default function DocumentPrepare() {
                         }}
                       />
                       <button
-                        onClick={() => navigator.clipboard.writeText(link.signingUrl)}
+                        onClick={() => {
+                          navigator.clipboard.writeText(link.signingUrl);
+                          setCopiedLink(link.signingUrl);
+                          setTimeout(() => setCopiedLink(null), 2000);
+                        }}
                         style={{
                           fontSize: '13px',
                           fontWeight: 500,
-                          backgroundColor: '#0071E3',
+                          backgroundColor: copiedLink === link.signingUrl ? '#34C759' : '#0071E3',
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
@@ -366,9 +374,10 @@ export default function DocumentPrepare() {
                           whiteSpace: 'nowrap',
                           height: '34px',
                           flexShrink: 0,
+                          transition: 'background-color 0.15s ease',
                         }}
                       >
-                        Copy
+                        {copiedLink === link.signingUrl ? 'Copied!' : 'Copy'}
                       </button>
                     </div>
                   </div>
@@ -435,7 +444,7 @@ export default function DocumentPrepare() {
   return (
     <PageEntrance>
       {/* Full-bleed layout: sidebar + content, flush to edges */}
-      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', margin: '-16px', backgroundColor: '#F5F5F7' }}>
+      <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', margin: '-16px', backgroundColor: '#F5F5F7' }}>
 
         {/* ── LEFT SIDEBAR ── */}
         <div
@@ -667,11 +676,12 @@ export default function DocumentPrepare() {
                       placeholder="Full name"
                       value={r.name}
                       onChange={(e) => updateRecipient(i, 'name', e.target.value)}
+                      aria-label={`Recipient ${i + 1} name`}
                       style={{
                         width: '100%',
                         height: '36px',
                         padding: '0 10px',
-                        fontSize: '13px',
+                        fontSize: '16px',
                         border: '1px solid #E8E8ED',
                         borderRadius: '8px',
                         backgroundColor: '#FFFFFF',
@@ -689,11 +699,12 @@ export default function DocumentPrepare() {
                       placeholder="Email address"
                       value={r.email}
                       onChange={(e) => updateRecipient(i, 'email', e.target.value)}
+                      aria-label={`Recipient ${i + 1} email`}
                       style={{
                         width: '100%',
                         height: '36px',
                         padding: '0 10px',
-                        fontSize: '13px',
+                        fontSize: '16px',
                         border: '1px solid #E8E8ED',
                         borderRadius: '8px',
                         backgroundColor: '#FFFFFF',
@@ -745,11 +756,12 @@ export default function DocumentPrepare() {
                 placeholder="Subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
+                aria-label="Email subject"
                 style={{
                   width: '100%',
                   height: '40px',
                   padding: '0 10px',
-                  fontSize: '13px',
+                  fontSize: '16px',
                   border: '1px solid #E8E8ED',
                   borderRadius: '8px',
                   backgroundColor: '#FFFFFF',
@@ -767,10 +779,11 @@ export default function DocumentPrepare() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={3}
+                aria-label="Message to recipients"
                 style={{
                   width: '100%',
                   padding: '10px',
-                  fontSize: '13px',
+                  fontSize: '16px',
                   border: '1px solid #E8E8ED',
                   borderRadius: '8px',
                   backgroundColor: '#FFFFFF',
@@ -789,7 +802,7 @@ export default function DocumentPrepare() {
 
             {/* Error message */}
             {error && (
-              <div style={{
+              <div role="alert" style={{
                 backgroundColor: 'rgba(182,68,0,0.06)',
                 border: '1px solid rgba(182,68,0,0.2)',
                 color: '#B64400',
@@ -806,7 +819,7 @@ export default function DocumentPrepare() {
             {/* Send button */}
             <MotionButton
               onClick={handleSend}
-              disabled={sending}
+              disabled={sending || (user?.credits ?? 0) < 1}
               style={{
                 width: '100%',
                 height: '44px',
@@ -820,15 +833,15 @@ export default function DocumentPrepare() {
                 borderRadius: '10px',
                 fontSize: '15px',
                 fontWeight: 500,
-                cursor: sending ? 'not-allowed' : 'pointer',
+                cursor: sending || (user?.credits ?? 0) < 1 ? 'not-allowed' : 'pointer',
                 transition: 'background-color 0.15s ease',
-                opacity: sending ? 0.7 : 1,
+                opacity: sending || (user?.credits ?? 0) < 1 ? 0.5 : 1,
               }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (!sending) (e.currentTarget as HTMLElement).style.backgroundColor = '#0066CC'; }}
+              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (!sending && (user?.credits ?? 0) >= 1) (e.currentTarget as HTMLElement).style.backgroundColor = '#0066CC'; }}
               onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (!sending) (e.currentTarget as HTMLElement).style.backgroundColor = '#0071E3'; }}
             >
               <Send style={{ width: '16px', height: '16px' }} />
-              {sending ? 'Sending...' : 'Send for Signing (1 credit)'}
+              {sending ? 'Sending...' : (user?.credits ?? 0) < 1 ? 'No Credits — Buy to Send' : 'Send for Signing (1 credit)'}
             </MotionButton>
 
           </div>
@@ -978,6 +991,7 @@ export default function DocumentPrepare() {
                 cursor: 'pointer',
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
+                minHeight: '44px',
               }}
             >
               {detectingFields ? <Loader2 style={{ width: '13px', height: '13px', animation: 'spin 0.8s linear infinite' }} /> : <Sparkles style={{ width: '13px', height: '13px' }} />}
@@ -1001,6 +1015,7 @@ export default function DocumentPrepare() {
                   cursor: 'pointer',
                   flexShrink: 0,
                   whiteSpace: 'nowrap',
+                  minHeight: '44px',
                 }}
               >
                 <ft.icon style={{ width: '12px', height: '12px' }} />
@@ -1023,6 +1038,7 @@ export default function DocumentPrepare() {
                 cursor: 'pointer',
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
+                minHeight: '44px',
               }}
             >
               <Edit3 style={{ width: '12px', height: '12px' }} />

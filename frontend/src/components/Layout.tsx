@@ -25,6 +25,35 @@ export default function Layout() {
 
   return (
     <div className="min-h-dvh bg-[#F5F5F7]">
+      {/* Skip to main content — visually hidden until focused */}
+      <a
+        href="#main-content"
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 'auto',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden',
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.left = '0';
+          e.currentTarget.style.width = 'auto';
+          e.currentTarget.style.height = 'auto';
+          e.currentTarget.style.padding = '8px 16px';
+          e.currentTarget.style.backgroundColor = '#0071E3';
+          e.currentTarget.style.color = '#FFFFFF';
+          e.currentTarget.style.zIndex = '9999';
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.left = '-9999px';
+          e.currentTarget.style.width = '1px';
+          e.currentTarget.style.height = '1px';
+        }}
+      >
+        Skip to main content
+      </a>
+
       {/* Nav bar */}
       <nav className="sticky top-0 z-50 bg-white border-b border-[#E8E8ED]">
         <div className="max-w-7xl mx-auto px-4 sm:px-10 flex items-center justify-between h-11 md:h-12">
@@ -111,7 +140,10 @@ export default function Layout() {
 
           {/* Mobile: credit pill + hamburger */}
           <div className="md:hidden flex items-center gap-2">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium bg-[#F5F5F7] border border-[#E8E8ED] text-[#1D1D1F]">
+            <span
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium bg-[#F5F5F7] border border-[#E8E8ED] text-[#1D1D1F]"
+              aria-label={`${user?.credits ?? 0} credits remaining`}
+            >
               {user?.credits ?? 0}
             </span>
             <button
@@ -182,7 +214,7 @@ export default function Layout() {
       </nav>
 
       {/* Page content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-10 py-6 sm:py-8">
+      <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-10 py-6 sm:py-8">
         <Outlet />
       </main>
     </div>

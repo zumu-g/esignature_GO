@@ -20,7 +20,7 @@ const SketchFilter = ({ id }: { id: string }) => (
 
 export function EmptyDocumentsIllustration({ className = '', size = 200 }: IllustrationProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" className={className}>
+    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" className={className} aria-hidden="true">
       <SketchFilter id="sketch-empty" />
       <g filter="url(#sketch-empty)">
         {/* Stack of papers */}
@@ -54,7 +54,7 @@ export function EmptyDocumentsIllustration({ className = '', size = 200 }: Illus
 
 export function SigningIllustration({ className = '', size = 200 }: IllustrationProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" className={className}>
+    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" className={className} aria-hidden="true">
       <SketchFilter id="sketch-sign" />
       <g filter="url(#sketch-sign)">
         {/* Document */}
@@ -93,7 +93,7 @@ export function SigningIllustration({ className = '', size = 200 }: Illustration
 
 export function SuccessIllustration({ className = '', size = 160 }: IllustrationProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 160 160" fill="none" className={className}>
+    <svg width={size} height={size} viewBox="0 0 160 160" fill="none" className={className} aria-hidden="true">
       <SketchFilter id="sketch-success" />
       <g filter="url(#sketch-success)">
         {/* Envelope / document */}
@@ -127,7 +127,7 @@ export function SuccessIllustration({ className = '', size = 160 }: Illustration
 
 export function CreditCoinIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" className={className}>
+    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" className={className} aria-hidden="true">
       <SketchFilter id="sketch-coin" />
       <g filter="url(#sketch-coin)">
         {/* Coin stack */}
@@ -158,7 +158,7 @@ export function CreditCoinIllustration({ className = '', size = 120 }: Illustrat
 
 export function WaitingIllustration({ className = '', size = 140 }: IllustrationProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 140 140" fill="none" className={className}>
+    <svg width={size} height={size} viewBox="0 0 140 140" fill="none" className={className} aria-hidden="true">
       <SketchFilter id="sketch-wait" />
       <g filter="url(#sketch-wait)">
         {/* Clock */}
@@ -191,7 +191,7 @@ export function WaitingIllustration({ className = '', size = 140 }: Illustration
 
 export function UploadIllustration({ className = '', size = 160 }: IllustrationProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 160 160" fill="none" className={className}>
+    <svg width={size} height={size} viewBox="0 0 160 160" fill="none" className={className} aria-hidden="true">
       <SketchFilter id="sketch-upload" />
       <g filter="url(#sketch-upload)">
         {/* Cloud */}

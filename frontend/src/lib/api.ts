@@ -1,6 +1,6 @@
 const API_BASE = '/api';
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, options: RequestInit & { signal?: AbortSignal } = {}): Promise<T> {
   const token = localStorage.getItem('token');
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
@@ -17,6 +17,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
+    signal: options.signal,
   });
 
   if (!res.ok) {
@@ -61,7 +62,7 @@ export const api = {
 
   getDocuments: () => request<Document[]>('/documents'),
 
-  getDocument: (id: string) => request<Document>('/documents/' + id),
+  getDocument: (id: string, signal?: AbortSignal) => request<Document>('/documents/' + id, { signal }),
 
   getDocumentPdfUrl: (id: string) => `${API_BASE}/documents/${id}/pdf`,
 
@@ -93,8 +94,7 @@ export const api = {
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    try { a.click(); } finally { URL.revokeObjectURL(url); }
   },
 
   // Signing (public)
@@ -142,7 +142,7 @@ export interface Document {
   id: string;
   userId: string;
   name: string;
-  filePath: string;
+  filePath?: string;
   pageCount: number;
   status: string;
   createdAt: string;

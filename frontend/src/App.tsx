@@ -1,11 +1,11 @@
-import { useEffect, Component } from 'react';
+import { useEffect, Component, lazy, Suspense } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import DocumentPrepare from './pages/DocumentPrepare';
+const DocumentPrepare = lazy(() => import('./pages/DocumentPrepare'));
 import SigningView from './pages/SigningView';
 import Credits from './pages/Credits';
 import Layout from './components/Layout';
@@ -96,7 +96,15 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="prepare/:id" element={<DocumentPrepare />} />
+          <Route path="prepare/:id" element={
+            <Suspense fallback={
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#F5F5F7' }}>
+                <div style={{ fontSize: '15px', color: '#6E6E73' }}>Loading…</div>
+              </div>
+            }>
+              <DocumentPrepare />
+            </Suspense>
+          } />
           <Route path="credits" element={<Credits />} />
         </Route>
         <Route path="*" element={<Navigate to="/" />} />

@@ -11,4 +11,15 @@ export default defineConfig({
       '/health': 'http://localhost:3001',
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-pdf': ['react-pdf', 'pdfjs-dist'],
+          'vendor-motion': ['framer-motion'],
+          'vendor-router': ['react-router-dom'],
+        },
+      },
+    },
+  },
 })
