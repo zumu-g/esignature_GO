@@ -657,7 +657,7 @@ export default function DocumentPrepare() {
         {/* ── LEFT SIDEBAR ── */}
         <div
           style={{
-            width: showSidebar || typeof window !== 'undefined' && window.innerWidth >= 1024 ? '300px' : '0',
+            width: showSidebar || typeof window !== 'undefined' && window.innerWidth >= 1024 ? '240px' : '0',
             flexShrink: 0,
             backgroundColor: '#FFFFFF',
             borderRight: '1px solid #E8E8ED',
@@ -668,7 +668,7 @@ export default function DocumentPrepare() {
           }}
           className={`${showSidebar ? 'block' : 'hidden'} lg:flex`}
         >
-          <div style={{ padding: '20px', flex: 1 }}>
+          <div style={{ padding: '14px', flex: 1 }}>
 
             {/* Smart Fill button */}
             <button
@@ -679,45 +679,45 @@ export default function DocumentPrepare() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                padding: '10px 16px',
-                borderRadius: '10px',
+                gap: '6px',
+                padding: '7px 12px',
+                borderRadius: '8px',
                 border: '1px solid #D1C4E9',
                 backgroundColor: '#F3F0FF',
                 color: '#7C3AED',
-                fontSize: '14px',
+                fontSize: '12px',
                 fontWeight: 500,
                 cursor: detectingFields ? 'not-allowed' : 'pointer',
                 opacity: detectingFields ? 0.6 : 1,
-                marginBottom: '20px',
+                marginBottom: '14px',
                 transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => { if (!detectingFields) e.currentTarget.style.backgroundColor = '#EDE9FE'; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#F3F0FF'; }}
             >
-              {detectingFields ? <Loader2 style={{ width: '16px', height: '16px', animation: 'spin 0.8s linear infinite' }} /> : <Sparkles style={{ width: '16px', height: '16px' }} />}
+              {detectingFields ? <Loader2 style={{ width: '13px', height: '13px', animation: 'spin 0.8s linear infinite' }} /> : <Sparkles style={{ width: '13px', height: '13px' }} />}
               {detectingFields ? 'Detecting fields...' : 'Smart Fill'}
             </button>
 
             {/* YOUR FIELDS section */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: '#6E6E73', textTransform: 'uppercase', letterSpacing: '0.06em', paddingBottom: '8px', borderBottom: '1px solid #E8E8ED', marginBottom: '10px' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: '#6E6E73', textTransform: 'uppercase', letterSpacing: '0.06em', paddingBottom: '6px', borderBottom: '1px solid #E8E8ED', marginBottom: '8px' }}>
                 Your Fields
               </div>
-              <p style={{ fontSize: '11px', color: '#6E6E73', marginBottom: '10px' }}>Fill in yourself — added directly to the PDF</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <p style={{ fontSize: '10px', color: '#6E6E73', marginBottom: '8px' }}>Fill in yourself — added directly to the PDF</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
                 <button
                   onClick={() => setDraggingField(draggingField === 'self-text' ? null : 'self-text')}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    gap: '4px',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
                     border: draggingField === 'self-text' ? '1px solid #0071E3' : '1px solid #E8E8ED',
                     backgroundColor: draggingField === 'self-text' ? 'rgba(0,113,227,0.08)' : '#FFFFFF',
                     color: draggingField === 'self-text' ? '#0071E3' : '#1D1D1F',
-                    fontSize: '13px',
+                    fontSize: '11px',
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
@@ -725,7 +725,7 @@ export default function DocumentPrepare() {
                   onMouseEnter={(e) => { if (draggingField !== 'self-text') { e.currentTarget.style.borderColor = '#0071E3'; e.currentTarget.style.backgroundColor = 'rgba(0,113,227,0.03)'; } }}
                   onMouseLeave={(e) => { if (draggingField !== 'self-text') { e.currentTarget.style.borderColor = '#E8E8ED'; e.currentTarget.style.backgroundColor = '#FFFFFF'; } }}
                 >
-                  <Edit3 style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+                  <Edit3 style={{ width: '11px', height: '11px', flexShrink: 0 }} />
                   Text
                 </button>
                 <button
@@ -733,13 +733,13 @@ export default function DocumentPrepare() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    gap: '4px',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
                     border: draggingField === 'self-date' ? '1px solid #0071E3' : '1px solid #E8E8ED',
                     backgroundColor: draggingField === 'self-date' ? 'rgba(0,113,227,0.08)' : '#FFFFFF',
                     color: draggingField === 'self-date' ? '#0071E3' : '#1D1D1F',
-                    fontSize: '13px',
+                    fontSize: '11px',
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
@@ -747,19 +747,19 @@ export default function DocumentPrepare() {
                   onMouseEnter={(e) => { if (draggingField !== 'self-date') { e.currentTarget.style.borderColor = '#0071E3'; e.currentTarget.style.backgroundColor = 'rgba(0,113,227,0.03)'; } }}
                   onMouseLeave={(e) => { if (draggingField !== 'self-date') { e.currentTarget.style.borderColor = '#E8E8ED'; e.currentTarget.style.backgroundColor = '#FFFFFF'; } }}
                 >
-                  <Calendar style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+                  <Calendar style={{ width: '11px', height: '11px', flexShrink: 0 }} />
                   Date
                 </button>
               </div>
             </div>
 
             {/* RECIPIENT FIELDS section */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: '#6E6E73', textTransform: 'uppercase', letterSpacing: '0.06em', paddingBottom: '8px', borderBottom: '1px solid #E8E8ED', marginBottom: '10px' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: '#6E6E73', textTransform: 'uppercase', letterSpacing: '0.06em', paddingBottom: '6px', borderBottom: '1px solid #E8E8ED', marginBottom: '8px' }}>
                 Recipient Fields
               </div>
-              <p style={{ fontSize: '11px', color: '#6E6E73', marginBottom: '10px' }}>Recipients fill these in when signing</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <p style={{ fontSize: '10px', color: '#6E6E73', marginBottom: '8px' }}>Recipients fill these in when signing</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
                 {FIELD_TYPES.map((ft) => (
                   <button
                     key={ft.type}
@@ -767,13 +767,13 @@ export default function DocumentPrepare() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
+                      gap: '4px',
+                      padding: '6px 8px',
+                      borderRadius: '6px',
                       border: draggingField === ft.type ? '1px solid #0071E3' : '1px solid #E8E8ED',
                       backgroundColor: draggingField === ft.type ? 'rgba(0,113,227,0.08)' : '#FFFFFF',
                       color: draggingField === ft.type ? '#0071E3' : '#1D1D1F',
-                      fontSize: '13px',
+                      fontSize: '11px',
                       fontWeight: 500,
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
@@ -781,7 +781,7 @@ export default function DocumentPrepare() {
                     onMouseEnter={(e) => { if (draggingField !== ft.type) { e.currentTarget.style.borderColor = '#0071E3'; e.currentTarget.style.backgroundColor = 'rgba(0,113,227,0.03)'; } }}
                     onMouseLeave={(e) => { if (draggingField !== ft.type) { e.currentTarget.style.borderColor = '#E8E8ED'; e.currentTarget.style.backgroundColor = '#FFFFFF'; } }}
                   >
-                    <ft.icon style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+                    <ft.icon style={{ width: '11px', height: '11px', flexShrink: 0 }} />
                     {ft.label}
                   </button>
                 ))}
@@ -791,10 +791,10 @@ export default function DocumentPrepare() {
             {/* Placement hint */}
             {draggingField && (
               <div style={{
-                fontSize: '12px',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                marginBottom: '16px',
+                fontSize: '11px',
+                padding: '7px 10px',
+                borderRadius: '6px',
+                marginBottom: '12px',
                 backgroundColor: draggingField.startsWith('self-') ? '#F0FDF4' : 'rgba(0,113,227,0.06)',
                 color: draggingField.startsWith('self-') ? '#059669' : '#0071E3',
                 border: `1px solid ${draggingField.startsWith('self-') ? '#A7F3D0' : 'rgba(0,113,227,0.2)'}`,
@@ -804,10 +804,10 @@ export default function DocumentPrepare() {
             )}
 
             {/* RECIPIENTS section */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid #E8E8ED', marginBottom: '12px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6E6E73', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Users style={{ width: '13px', height: '13px' }} />
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid #E8E8ED', marginBottom: '8px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 600, color: '#6E6E73', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Users style={{ width: '11px', height: '11px' }} />
                   Recipients
                 </div>
                 <button
@@ -817,9 +817,9 @@ export default function DocumentPrepare() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '7px',
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '5px',
                     border: '1px solid #E8E8ED',
                     backgroundColor: '#FFFFFF',
                     color: '#0071E3',
@@ -829,32 +829,24 @@ export default function DocumentPrepare() {
                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(0,113,227,0.06)'; e.currentTarget.style.borderColor = '#0071E3'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#E8E8ED'; }}
                 >
-                  <Plus style={{ width: '14px', height: '14px' }} />
+                  <Plus style={{ width: '12px', height: '12px' }} />
                 </button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '4px' }}>
                 {recipients.map((r, i) => (
                   <div
                     key={i}
                     style={{
                       border: '1px solid #E8E8ED',
-                      borderRadius: '10px',
-                      padding: '12px',
+                      borderRadius: '8px',
+                      padding: '8px',
                       backgroundColor: '#FAFAFA',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <div
-                        style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          flexShrink: 0,
-                          backgroundColor: RECIPIENT_COLORS[i % RECIPIENT_COLORS.length],
-                        }}
-                      />
-                      <span style={{ fontSize: '12px', fontWeight: 500, color: '#6E6E73', flex: 1 }}>Recipient {i + 1}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0, backgroundColor: RECIPIENT_COLORS[i % RECIPIENT_COLORS.length] }} />
+                      <span style={{ fontSize: '11px', fontWeight: 500, color: '#6E6E73', flex: 1 }}>Recipient {i + 1}</span>
                       {recipients.length > 1 && (
                         <button
                           onClick={() => removeRecipient(i)}
@@ -863,9 +855,9 @@ export default function DocumentPrepare() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '6px',
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '5px',
                             border: 'none',
                             backgroundColor: 'transparent',
                             color: '#6E6E73',
@@ -875,7 +867,7 @@ export default function DocumentPrepare() {
                           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF0F0'; e.currentTarget.style.color = '#B64400'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6E6E73'; }}
                         >
-                          <Trash2 style={{ width: '13px', height: '13px' }} />
+                          <Trash2 style={{ width: '11px', height: '11px' }} />
                         </button>
                       )}
                     </div>
@@ -887,19 +879,19 @@ export default function DocumentPrepare() {
                       aria-label={`Recipient ${i + 1} name`}
                       style={{
                         width: '100%',
-                        height: '36px',
-                        padding: '0 10px',
-                        fontSize: '13px',
+                        height: '28px',
+                        padding: '0 8px',
+                        fontSize: '12px',
                         border: '1px solid #E8E8ED',
-                        borderRadius: '8px',
+                        borderRadius: '6px',
                         backgroundColor: '#FFFFFF',
                         color: '#1D1D1F',
                         outline: 'none',
-                        marginBottom: '6px',
+                        marginBottom: '4px',
                         boxSizing: 'border-box',
                         transition: 'border-color 0.15s ease',
                       }}
-                      onFocus={(e) => { e.target.style.borderColor = '#0071E3'; e.target.style.boxShadow = '0 0 0 3px rgba(0,113,227,0.15)'; }}
+                      onFocus={(e) => { e.target.style.borderColor = '#0071E3'; e.target.style.boxShadow = '0 0 0 2px rgba(0,113,227,0.15)'; }}
                       onBlur={(e) => { e.target.style.borderColor = '#E8E8ED'; e.target.style.boxShadow = 'none'; }}
                     />
                     <input
@@ -910,19 +902,19 @@ export default function DocumentPrepare() {
                       aria-label={`Recipient ${i + 1} email`}
                       style={{
                         width: '100%',
-                        height: '36px',
-                        padding: '0 10px',
-                        fontSize: '13px',
+                        height: '28px',
+                        padding: '0 8px',
+                        fontSize: '12px',
                         border: '1px solid #E8E8ED',
-                        borderRadius: '8px',
+                        borderRadius: '6px',
                         backgroundColor: '#FFFFFF',
                         color: '#1D1D1F',
                         outline: 'none',
-                        marginBottom: '6px',
+                        marginBottom: '4px',
                         boxSizing: 'border-box',
                         transition: 'border-color 0.15s ease',
                       }}
-                      onFocus={(e) => { e.target.style.borderColor = '#0071E3'; e.target.style.boxShadow = '0 0 0 3px rgba(0,113,227,0.15)'; }}
+                      onFocus={(e) => { e.target.style.borderColor = '#0071E3'; e.target.style.boxShadow = '0 0 0 2px rgba(0,113,227,0.15)'; }}
                       onBlur={(e) => { e.target.style.borderColor = '#E8E8ED'; e.target.style.boxShadow = 'none'; }}
                     />
                     <select
@@ -930,11 +922,11 @@ export default function DocumentPrepare() {
                       onChange={(e) => updateRecipient(i, 'role', e.target.value)}
                       style={{
                         width: '100%',
-                        height: '36px',
-                        padding: '0 10px',
-                        fontSize: '13px',
+                        height: '28px',
+                        padding: '0 8px',
+                        fontSize: '12px',
                         border: '1px solid #E8E8ED',
-                        borderRadius: '8px',
+                        borderRadius: '6px',
                         backgroundColor: '#FFFFFF',
                         color: '#1D1D1F',
                         outline: 'none',
@@ -942,7 +934,7 @@ export default function DocumentPrepare() {
                         cursor: 'pointer',
                         transition: 'border-color 0.15s ease',
                       }}
-                      onFocus={(e) => { e.target.style.borderColor = '#0071E3'; e.target.style.boxShadow = '0 0 0 3px rgba(0,113,227,0.15)'; }}
+                      onFocus={(e) => { e.target.style.borderColor = '#0071E3'; e.target.style.boxShadow = '0 0 0 2px rgba(0,113,227,0.15)'; }}
                       onBlur={(e) => { e.target.style.borderColor = '#E8E8ED'; e.target.style.boxShadow = 'none'; }}
                     >
                       <option value="signer">Signer</option>
@@ -955,8 +947,8 @@ export default function DocumentPrepare() {
             </div>
 
             {/* MESSAGE section */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: '#6E6E73', textTransform: 'uppercase', letterSpacing: '0.06em', paddingBottom: '8px', borderBottom: '1px solid #E8E8ED', marginBottom: '12px' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: '#6E6E73', textTransform: 'uppercase', letterSpacing: '0.06em', paddingBottom: '6px', borderBottom: '1px solid #E8E8ED', marginBottom: '8px' }}>
                 Message
               </div>
               <input
@@ -967,15 +959,15 @@ export default function DocumentPrepare() {
                 aria-label="Email subject"
                 style={{
                   width: '100%',
-                  height: '40px',
-                  padding: '0 10px',
-                  fontSize: '13px',
+                  height: '28px',
+                  padding: '0 8px',
+                  fontSize: '12px',
                   border: '1px solid #E8E8ED',
-                  borderRadius: '8px',
+                  borderRadius: '6px',
                   backgroundColor: '#FFFFFF',
                   color: '#1D1D1F',
                   outline: 'none',
-                  marginBottom: '8px',
+                  marginBottom: '6px',
                   boxSizing: 'border-box',
                   transition: 'border-color 0.15s ease',
                 }}
@@ -990,10 +982,10 @@ export default function DocumentPrepare() {
                 aria-label="Message to recipients"
                 style={{
                   width: '100%',
-                  padding: '10px',
-                  fontSize: '13px',
+                  padding: '7px',
+                  fontSize: '12px',
                   border: '1px solid #E8E8ED',
-                  borderRadius: '8px',
+                  borderRadius: '6px',
                   backgroundColor: '#FFFFFF',
                   color: '#1D1D1F',
                   outline: 'none',
