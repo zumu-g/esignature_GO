@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { PageEntrance, MotionButton, SuccessEntrance, FadeIn } from '../components/Motion';
 import { SuccessIllustration } from '../components/Illustrations';
-import { motion } from 'framer-motion';
+import { motion, useDragControls, useMotionValue } from 'framer-motion';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -52,6 +52,179 @@ const RECIPIENT_COLORS = ['#0071E3', '#8B5CF6', '#059669', '#F97316', '#EF4444']
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
+// ── Field overlay component — owns drag controls and resize state ──
+interface FieldOverlayProps {
+  field: PlacedField;
+  isSelected: boolean;
+  color: string;
+  isSelfFill: boolean;
+  pageRef: React.RefObject<HTMLDivElement>;
+  recipients: RecipientEntry[];
+  draggingPlacedField: string | null;
+  setDraggingPlacedField: (id: string | null) => void;
+  onSelect: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<PlacedField>) => void;
+  onRemove: (id: string) => void;
+}
+
+function FieldOverlay({
+  field, isSelected, color, isSelfFill, pageRef,
+  recipients, draggingPlacedField, setDraggingPlacedField,
+  onSelect, onUpdate, onRemove,
+}: FieldOverlayProps) {
+  const dragControls = useDragControls();
+  // Motion values own the position — no CSS left/top, so Framer Motion
+  // never needs to reset a transform on drop, eliminating position jumps.
+  const mx = useMotionValue(field.x);
+  const my = useMotionValue(field.y);
+  const resizeRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
+
+  // Sync when position changes externally (arrow key nudge)
+  useEffect(() => { mx.set(field.x); }, [field.x]);
+  useEffect(() => { my.set(field.y); }, [field.y]);
+
+  const startResize = (e: React.PointerEvent, mode: 'w' | 'both') => {
+    e.stopPropagation();
+    e.preventDefault();
+    resizeRef.current = { startX: e.clientX, startY: e.clientY, startW: field.width, startH: field.height };
+    const onMove = (me: PointerEvent) => {
+      if (!resizeRef.current) return;
+      const dw = me.clientX - resizeRef.current.startX;
+      const dh = me.clientY - resizeRef.current.startY;
+      const updates: Partial<PlacedField> = {};
+      if (mode === 'w' || mode === 'both') updates.width = Math.max(60, resizeRef.current.startW + dw);
+      if (mode === 'both') updates.height = Math.max(20, resizeRef.current.startH + dh);
+      onUpdate(field.id, updates);
+    };
+    const onUp = () => {
+      resizeRef.current = null;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  const fieldH = Math.max(field.height, 30);
+
+  return (
+    <motion.div
+      drag
+      dragMomentum={false}
+      dragListener={false}
+      dragControls={dragControls}
+      dragConstraints={pageRef}
+      dragElastic={0}
+      style={{
+        x: mx,
+        y: my,
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        width: field.width,
+        height: fieldH,
+        border: isSelected ? `2px solid ${color}` : `1px solid ${color}`,
+        borderStyle: isSelfFill ? 'dashed' : 'solid',
+        borderRadius: '4px',
+        backgroundColor: isSelfFill ? `${color}0D` : `${color}15`,
+        boxShadow: isSelected ? `0 0 0 3px ${color}30` : 'none',
+        display: 'flex',
+        alignItems: 'center',
+        cursor: 'default',
+        userSelect: 'none',
+        touchAction: 'none',
+        transition: 'box-shadow 0.15s ease',
+      }}
+      whileDrag={{ scale: 1.02, boxShadow: '0 4px 16px rgba(0,0,0,0.18)', zIndex: 50 }}
+      onDragStart={() => setDraggingPlacedField(field.id)}
+      onDragEnd={() => {
+        // mx/my already hold the final constrained position — no offset math needed
+        onUpdate(field.id, { x: mx.get(), y: my.get() });
+        setTimeout(() => setDraggingPlacedField(null), 50);
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!draggingPlacedField) onSelect(field.id);
+      }}
+    >
+      {isSelfFill ? (
+        <div style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%' }}>
+          <div
+            onPointerDown={(e) => { e.stopPropagation(); dragControls.start(e); }}
+            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '0 4px', color, cursor: 'grab' }}
+            title="Drag to reposition"
+          >
+            <GripVertical style={{ width: '12px', height: '12px' }} />
+          </div>
+          <input
+            type={field.type === 'date' ? 'date' : 'text'}
+            value={field.value || ''}
+            placeholder={field.type === 'date' ? '' : 'Type here...'}
+            onChange={(e) => { e.stopPropagation(); onUpdate(field.id, { value: e.target.value }); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            style={{ flex: 1, minWidth: 0, height: '100%', padding: '0 4px', fontSize: '12px', backgroundColor: 'transparent', border: 'none', outline: 'none', color: '#1D1D1F' }}
+          />
+        </div>
+      ) : (
+        <div
+          onPointerDown={(e) => { e.stopPropagation(); dragControls.start(e); }}
+          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0 6px', cursor: 'grab', width: '100%' }}
+        >
+          <GripVertical style={{ width: '10px', height: '10px', color, flexShrink: 0 }} />
+          <span style={{ fontSize: '10px', fontWeight: 600, color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            {field.type}
+          </span>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: color, marginLeft: '2px', flexShrink: 0 }} />
+        </div>
+      )}
+
+      {/* Right-edge resize handle — drag to extend width */}
+      <div
+        onPointerDown={(e) => startResize(e, 'w')}
+        style={{ position: 'absolute', right: -5, top: 0, bottom: 0, width: 10, cursor: 'ew-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5 }}
+        title="Drag to resize width"
+      >
+        <div style={{ width: 3, height: Math.min(16, fieldH * 0.6), backgroundColor: color, borderRadius: 2, opacity: isSelected ? 0.7 : 0.25, transition: 'opacity 0.15s' }} />
+      </div>
+
+      {/* Bottom-right corner handle — drag to resize both width + height */}
+      <div
+        onPointerDown={(e) => startResize(e, 'both')}
+        style={{ position: 'absolute', right: -4, bottom: -4, width: 10, height: 10, cursor: 'nwse-resize', backgroundColor: color, borderRadius: '2px', opacity: isSelected ? 0.9 : 0, transition: 'opacity 0.15s', zIndex: 6 }}
+        title="Drag to resize"
+      />
+
+      {/* Selected field toolbar */}
+      {isSelected && (
+        <div style={{ position: 'absolute', top: '-36px', right: '0', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#FFFFFF', border: '1px solid #E8E8ED', borderRadius: '8px', padding: '4px 6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 10 }}>
+          {!isSelfFill && (
+            <select
+              value={field.recipientIndex}
+              onChange={(e) => { e.stopPropagation(); onUpdate(field.id, { recipientIndex: Number(e.target.value) }); }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ fontSize: '11px', border: '1px solid #E8E8ED', borderRadius: '6px', padding: '2px 6px', height: '26px', color: '#1D1D1F', outline: 'none', cursor: 'pointer', backgroundColor: '#FFFFFF' }}
+            >
+              {recipients.map((r, i) => (
+                <option key={i} value={i}>{r.name || `Recipient ${i + 1}`}</option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove(field.id); }}
+            aria-label="Delete field"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: '6px', border: 'none', backgroundColor: '#B64400', color: '#FFFFFF', cursor: 'pointer', flexShrink: 0 }}
+          >
+            <Trash2 style={{ width: '12px', height: '12px' }} />
+          </button>
+          <span style={{ fontSize: '10px', color: '#8A8A8E', whiteSpace: 'nowrap', paddingLeft: '2px' }}>↑↓←→ nudge · ⌘C copy · ⌘V paste</span>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 export default function DocumentPrepare() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -71,6 +244,7 @@ export default function DocumentPrepare() {
   const [draggingPlacedField, setDraggingPlacedField] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
+  const copiedFieldRef = useRef<PlacedField | null>(null);
 
   // Responsive PDF width — constrain to viewport on mobile
   const pdfWidth = Math.min(612, viewportWidth - 32);
@@ -149,18 +323,52 @@ export default function DocumentPrepare() {
     setDraggingField(null);
   }, [draggingField, draggingPlacedField, currentPage, pdfWidth]);
 
-  const removeField = (fieldId: string) => {
+  const removeField = useCallback((fieldId: string) => {
     setFields((prev) => prev.filter((f) => f.id !== fieldId));
-    if (selectedField === fieldId) setSelectedField(null);
-  };
+    setSelectedField((sel) => sel === fieldId ? null : sel);
+  }, []);
 
-  // Arrow key nudging for selected fields
+  const updateField = useCallback((fieldId: string, updates: Partial<PlacedField>) => {
+    setFields((prev) => prev.map((f) => f.id === fieldId ? { ...f, ...updates } : f));
+  }, []);
+
+  // Arrow key nudging + Cmd/Ctrl+C copy + Cmd/Ctrl+V paste
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedField) return;
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
+      const mod = e.metaKey || e.ctrlKey;
+
+      // Copy selected field
+      if (mod && e.key === 'c' && selectedField) {
+        e.preventDefault();
+        setFields((prev) => {
+          const f = prev.find((f) => f.id === selectedField);
+          if (f) copiedFieldRef.current = f;
+          return prev;
+        });
+        return;
+      }
+
+      // Paste copied field (offset by 16px so it doesn't perfectly overlap)
+      if (mod && e.key === 'v' && copiedFieldRef.current) {
+        e.preventDefault();
+        const src = copiedFieldRef.current;
+        const newField: PlacedField = {
+          ...src,
+          id: generateId(),
+          x: src.x + 16,
+          y: src.y + 16,
+        };
+        setFields((prev) => [...prev, newField]);
+        setSelectedField(newField.id);
+        copiedFieldRef.current = newField; // next paste offsets from the new copy
+        return;
+      }
+
+      // Arrow key nudge
+      if (!selectedField) return;
       const DIRS: Record<string, [number, number]> = {
         ArrowLeft: [-1, 0], ArrowRight: [1, 0],
         ArrowUp: [0, -1], ArrowDown: [0, 1],
@@ -681,7 +889,7 @@ export default function DocumentPrepare() {
                         width: '100%',
                         height: '36px',
                         padding: '0 10px',
-                        fontSize: '16px',
+                        fontSize: '13px',
                         border: '1px solid #E8E8ED',
                         borderRadius: '8px',
                         backgroundColor: '#FFFFFF',
@@ -704,7 +912,7 @@ export default function DocumentPrepare() {
                         width: '100%',
                         height: '36px',
                         padding: '0 10px',
-                        fontSize: '16px',
+                        fontSize: '13px',
                         border: '1px solid #E8E8ED',
                         borderRadius: '8px',
                         backgroundColor: '#FFFFFF',
@@ -761,7 +969,7 @@ export default function DocumentPrepare() {
                   width: '100%',
                   height: '40px',
                   padding: '0 10px',
-                  fontSize: '16px',
+                  fontSize: '13px',
                   border: '1px solid #E8E8ED',
                   borderRadius: '8px',
                   backgroundColor: '#FFFFFF',
@@ -783,7 +991,7 @@ export default function DocumentPrepare() {
                 style={{
                   width: '100%',
                   padding: '10px',
-                  fontSize: '16px',
+                  fontSize: '13px',
                   border: '1px solid #E8E8ED',
                   borderRadius: '8px',
                   backgroundColor: '#FFFFFF',
@@ -1121,187 +1329,23 @@ export default function DocumentPrepare() {
                 />
               </PdfDocument>
 
-              {/* Placed fields overlay — draggable */}
-              {pageFields.map((field) => {
-                const isSelfFill = field.recipientIndex === -1;
-                const color = isSelfFill ? '#059669' : RECIPIENT_COLORS[field.recipientIndex % RECIPIENT_COLORS.length];
-                const isSelected = selectedField === field.id;
-
-                return (
-                  <motion.div
-                    key={field.id}
-                    drag
-                    dragMomentum={false}
-                    dragConstraints={pageRef}
-                    dragElastic={0}
-                    initial={false}
-                    transition={{ type: 'tween', duration: 0 }}
-                    whileDrag={{ scale: 1.02, boxShadow: '0 4px 16px rgba(0,0,0,0.18)', zIndex: 50 }}
-                    onDragStart={() => setDraggingPlacedField(field.id)}
-                    onDragEnd={(_e, info) => {
-                      setFields((prev) =>
-                        prev.map((f) => {
-                          if (f.id !== field.id) return f;
-                          const newX = Math.max(0, f.x + info.offset.x);
-                          const newY = Math.max(0, f.y + info.offset.y);
-                          return { ...f, x: newX, y: newY };
-                        })
-                      );
-                      setTimeout(() => setDraggingPlacedField(null), 50);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      left: field.x,
-                      top: field.y,
-                      width: field.width,
-                      height: Math.max(field.height, 30),
-                      border: isSelected ? `2px solid ${color}` : `1px solid ${color}`,
-                      borderStyle: isSelfFill ? 'dashed' : 'solid',
-                      borderRadius: '4px',
-                      backgroundColor: isSelfFill ? `${color}0D` : `${color}15`,
-                      boxShadow: isSelected ? `0 0 0 3px ${color}30` : 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      cursor: 'grab',
-                      userSelect: 'none',
-                      touchAction: 'none',
-                      transition: 'box-shadow 0.15s ease',
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!draggingPlacedField) {
-                        setSelectedField(field.id === selectedField ? null : field.id);
-                      }
-                    }}
-                  >
-                    {isSelfFill ? (
-                      <div style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%' }}>
-                        <div
-                          style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '0 4px', color, cursor: 'grab' }}
-                          title="Drag to reposition"
-                        >
-                          <GripVertical style={{ width: '12px', height: '12px' }} />
-                        </div>
-                        <input
-                          type={field.type === 'date' ? 'date' : 'text'}
-                          value={field.value || ''}
-                          placeholder={field.type === 'date' ? '' : 'Type here...'}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            setFields((prev) =>
-                              prev.map((f) => f.id === field.id ? { ...f, value: e.target.value } : f)
-                            );
-                          }}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            height: '100%',
-                            padding: '0 4px',
-                            fontSize: '12px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            outline: 'none',
-                            color: '#1D1D1F',
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', pointerEvents: 'none', padding: '0 6px' }}>
-                        <GripVertical style={{ width: '10px', height: '10px', color }} />
-                        <span style={{ fontSize: '10px', fontWeight: 600, color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          {field.type}
-                        </span>
-                        {/* Recipient color dot */}
-                        <div style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          backgroundColor: color,
-                          marginLeft: '2px',
-                        }} />
-                      </div>
-                    )}
-
-                    {/* Selected field toolbar */}
-                    {isSelected && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '-36px',
-                          right: '0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #E8E8ED',
-                          borderRadius: '8px',
-                          padding: '4px 6px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                          zIndex: 10,
-                        }}
-                      >
-                        {!isSelfFill && (
-                          <select
-                            value={field.recipientIndex}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setFields((prev) =>
-                                prev.map((f) => f.id === field.id ? { ...f, recipientIndex: Number(e.target.value) } : f)
-                              );
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                              fontSize: '11px',
-                              border: '1px solid #E8E8ED',
-                              borderRadius: '6px',
-                              padding: '2px 6px',
-                              height: '26px',
-                              color: '#1D1D1F',
-                              outline: 'none',
-                              cursor: 'pointer',
-                              backgroundColor: '#FFFFFF',
-                            }}
-                          >
-                            {recipients.map((r, i) => (
-                              <option key={i} value={i}>
-                                {r.name || `Recipient ${i + 1}`}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeField(field.id);
-                          }}
-                          aria-label="Delete field"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '26px',
-                            height: '26px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            backgroundColor: '#B64400',
-                            color: '#FFFFFF',
-                            cursor: 'pointer',
-                            flexShrink: 0,
-                          }}
-                        >
-                          <Trash2 style={{ width: '12px', height: '12px' }} />
-                        </button>
-                        <span style={{ fontSize: '10px', color: '#8A8A8E', whiteSpace: 'nowrap', paddingLeft: '2px' }}>
-                          ↑↓←→ nudge
-                        </span>
-                      </div>
-                    )}
-                  </motion.div>
-                );
-              })}
+              {/* Placed fields overlay */}
+              {pageFields.map((field) => (
+                <FieldOverlay
+                  key={field.id}
+                  field={field}
+                  isSelected={selectedField === field.id}
+                  color={field.recipientIndex === -1 ? '#059669' : RECIPIENT_COLORS[field.recipientIndex % RECIPIENT_COLORS.length]}
+                  isSelfFill={field.recipientIndex === -1}
+                  pageRef={pageRef}
+                  recipients={recipients}
+                  draggingPlacedField={draggingPlacedField}
+                  setDraggingPlacedField={setDraggingPlacedField}
+                  onSelect={(id) => setSelectedField(id === selectedField ? null : id)}
+                  onUpdate={updateField}
+                  onRemove={removeField}
+                />
+              ))}
             </div>
           </div>
         </div>
